@@ -5,15 +5,16 @@ import 'viewmodels/UserViewModel.dart ';
 import 'package:provider/provider.dart';
 import 'package:my_app/view/Profile.dart';
 import 'package:my_app/view/logout.dart';
-import 'package:my_app/view/client/Register.dart';
+import 'package:my_app/view/client/register_client.dart';
+import 'package:my_app/view/client/Home/official.dart';
 import 'package:my_app/viewmodels/artisan_view_model.dart';
+
+import 'package:my_app/view/artisan/Home/official.dart';
 import 'package:my_app/view/client/planc.dart';
-import 'package:my_app/view/artisan/RegisterA.dart';
-import 'view/connectapp.dart';
+import 'package:my_app/view/artisan/register_Artisan.dart';
+import 'package:my_app/viewmodels/handle.dart';
+import 'view/connect_app.dart';
 import 'package:my_app/viewmodels/client_view_model.dart';
-
-
-
 
 void main() {
   runApp(
@@ -21,7 +22,7 @@ void main() {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()..init()),
         ChangeNotifierProvider(create: (_) => ArtisanViewModel()),
-           ChangeNotifierProvider(create: (_) => ClientViewModel()),
+        ChangeNotifierProvider(create: (_) => ClientViewModel()),
       ],
 
       child: const MyApp(),
@@ -38,11 +39,11 @@ class MyApp extends StatelessWidget {
     return Consumer<AuthProvider>(
       builder: (context, auth, _) {
         Widget startWidget;
-if (auth.token != null && auth.token!.isNotEmpty) {
-  startWidget = const HomePage();   // ✅ logged → home
-} else {
-  startWidget = const LoginPage();    // ❌ not logged → login
-}
+        if (auth.token != null && auth.token!.isNotEmpty) {
+          startWidget = const LoginPage(); // ✅ logged → home
+        } else {
+          startWidget = const LoginPage(); // ❌ not logged → login
+        }
         return MaterialApp(
           title: 'Flutter Demo',
           debugShowCheckedModeBanner: false,
@@ -54,13 +55,15 @@ if (auth.token != null && auth.token!.isNotEmpty) {
           routes: {
             '/login': (_) => const LoginPage(),
             '/home': (_) => SubscriptionPlans(),
+            '/home/client': (_) => HomeShell(),
             '/logout': (_) => const LogoutPage(),
             '/profile': (_) => const ProfilePage(),
-            '/connect' : (_) => const ChooseProfilePage(),
+            '/connect': (_) => const ChooseProfilePage(),
             '/client/register': (_) => const RegisterPage(),
             '/artisan/register': (_) => const ArtisanRegister(),
-            
-          },
+            '/connectgoogle':(_) =>  GoogleLoginDemo(),
+            '/home/artisan' : (_)=>  HomeShell()
+          }, 
         );
       },
     );

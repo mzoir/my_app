@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:my_app/models/User.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:my_app/models/service_request.dart';
 
 class AuthProvider extends ChangeNotifier {
   // ✅ Android emulator: 10.0.2.2
@@ -17,7 +18,10 @@ class AuthProvider extends ChangeNotifier {
   String? error;
   String? token;
 
-  User? user; 
+  User? user;
+  List<ServiceRequest> requests = [];
+
+  // ── Init ─────────────────────────────────────────────────────────
 
   Future<void> init() async {
     token = await _storage.read(key: 'token');
@@ -27,13 +31,15 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ── Auth ─────────────────────────────────────────────────────────
+
   Future<bool> login(String email, String password) async {
     loading = true;
     error = null;
     notifyListeners();
 
     try {
-      final uri = Uri.parse('$baseUrl/api/login'); // ✅ adjust if your route differs
+      final uri = Uri.parse('$baseUrl/api/login');
 
       final res = await http.post(
         uri,
@@ -41,15 +47,12 @@ class AuthProvider extends ChangeNotifier {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'email': email,
-          'password': password,
-        }),
+        body: jsonEncode({'email': email, 'password': password}),
       );
 
       final data = jsonDecode(res.body);
       print(data);
-      
+
       if (res.statusCode == 200 || res.statusCode == 201) {
         token = data['token']?.toString();
         if (token == null) {
@@ -57,11 +60,9 @@ class AuthProvider extends ChangeNotifier {
           return false;
         }
         await _storage.write(key: 'token', value: token);
-        // load current user after successful login
         await loadUser();
         return true;
       } else {
-        // Laravel often returns: {message: "..."} or {errors: {...}}
         error = (data is Map && data['message'] != null)
             ? data['message'].toString()
             : 'Login failed (${res.statusCode})';
@@ -76,7 +77,13 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> register(String name, String email, String password, String phone, String dateOfBirth) async {
+  Future<bool> register(
+    String name,
+    String email,
+    String password,
+    String phone,
+    String dateOfBirth,
+  ) async {
     loading = true;
     error = null;
     notifyListeners();
@@ -101,7 +108,7 @@ class AuthProvider extends ChangeNotifier {
 
       final data = jsonDecode(res.body);
       print(data);
-      
+
       if (res.statusCode == 200 || res.statusCode == 201) {
         token = data['token']?.toString();
         if (token != null) {
@@ -126,35 +133,32 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     token = null;
     user = null;
+    requests = [];
     await _storage.delete(key: 'token');
     notifyListeners();
   }
 
-  // Load user from /api/me using saved token
+  // ── User ─────────────────────────────────────────────────────────
+
   Future<bool> loadUser() async {
     final res = await me();
     print(res);
     if (res == null) return false;
 
-  
-  
     try {
-    final dynamic raw = res['user'] ?? res;
-
-    final userMap = Map<String, dynamic>.from(raw as Map);
-    user = User.fromJson(userMap);
+      final dynamic raw = res['user'] ?? res;
+      final userMap = Map<String, dynamic>.from(raw as Map);
+      user = User.fromJson(userMap);
       print(user);
       notifyListeners();
       return true;
     } catch (e) {
-      // parsing error
       error = 'Failed to parse user data: $e';
-       print(error);
+      print(error);
       return false;
     }
   }
 
-  // Example: call /api/me with Bearer token
   Future<Map<String, dynamic>?> me() async {
     final t = token ?? await _storage.read(key: 'token');
     if (t == null) return null;
@@ -169,11 +173,205 @@ class AuthProvider extends ChangeNotifier {
       );
 
       if (res.statusCode == 200) {
-        print(200);
         return Map<String, dynamic>.from(jsonDecode(res.body));
       }
       return null;
     } catch (_) {
+      return null;
+    }
+  }
+
+  // ── Requests ─────────────────────────────────────────────────────
+
+  /// GET /api/requests — fetch the authenticated user's requests
+  Future<bool> fetchRequests() async {
+    try {
+      final uri = Uri.parse('$baseUrl/api/requests');
+      final res = await http.get(
+        uri,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        requests = (data['data'] as List)
+            .map((r) => ServiceRequest.fromJson(r as Map<String, dynamic>))
+            .toList();
+        notifyListeners();
+        return true;
+      } else {
+        error = 'Failed to fetch requests (${res.statusCode})';
+        return false;
+      }
+    } catch (e) {
+      error = 'Network error: $e';
+      return false;
+    }
+  }
+
+  /// POST /api/requests — create a new service request
+  Future<bool> createRequest({
+    required String serviceName,
+    required String serviceType,
+    required String description,
+    required String ville,
+    required String address,
+    String? additionalInfo,
+  }) async {
+    loading = true;
+    error = null;
+    notifyListeners();
+
+    try {
+      final uri = Uri.parse('$baseUrl/api/requests');
+      final res = await http.post(
+        uri,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'service_name': serviceName,
+          'service_type': serviceType,
+          'description': description,
+          'ville': ville,
+          'address': address,
+          if (additionalInfo != null) 'additional_info': additionalInfo,
+        }),
+      );
+
+      if (res.statusCode == 201) {
+        await fetchRequests(); // Refresh list
+        return true;
+      } else {
+        final data = jsonDecode(res.body);
+        error = (data is Map && data['message'] != null)
+            ? data['message'].toString()
+            : 'Failed to create request (${res.statusCode})';
+        return false;
+      }
+    } catch (e) {
+      error = 'Network error: $e';
+      return false;
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
+  }
+
+  /// DELETE /api/requests/{id} — delete a service request
+  Future<bool> deleteRequest(int requestId) async {
+    loading = true;
+    error = null;
+    notifyListeners();
+
+    try {
+      final uri = Uri.parse('$baseUrl/api/requests/$requestId');
+      final res = await http.delete(
+        uri,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (res.statusCode == 200) {
+        await fetchRequests(); // Refresh list
+        return true;
+      } else {
+        final data = jsonDecode(res.body);
+        error = (data is Map && data['message'] != null)
+            ? data['message'].toString()
+            : 'Failed to delete request (${res.statusCode})';
+        return false;
+      }
+    } catch (e) {
+      error = 'Network error: $e';
+      return false;
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
+  }
+
+  /// PUT /api/requests/{id} — update an existing service request
+  Future<bool> updateRequest(
+    int requestId, {
+    String? serviceName,
+    String? serviceType,
+    String? description,
+    String? ville,
+    String? address,
+    String? additionalInfo,
+    String? status,
+  }) async {
+    loading = true;
+    error = null;
+    notifyListeners();
+
+    try {
+      final uri = Uri.parse('$baseUrl/api/requests/$requestId');
+      final res = await http.put(
+        uri,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          if (serviceName != null) 'service_name': serviceName,
+          if (serviceType != null) 'service_type': serviceType,
+          if (description != null) 'description': description,
+          if (ville != null) 'ville': ville,
+          if (address != null) 'address': address,
+          if (additionalInfo != null) 'additional_info': additionalInfo,
+          if (status != null) 'status': status,
+        }),
+      );
+
+      if (res.statusCode == 200) {
+        await fetchRequests(); // Refresh list
+        return true;
+      } else {
+        final data = jsonDecode(res.body);
+        error = (data is Map && data['message'] != null)
+            ? data['message'].toString()
+            : 'Failed to update request (${res.statusCode})';
+        return false;
+      }
+    } catch (e) {
+      error = 'Network error: $e';
+      return false;
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
+  }
+
+  /// GET /api/requests/{id} — fetch a single request by id
+  Future<ServiceRequest?> getRequest(int requestId) async {
+    try {
+      final uri = Uri.parse('$baseUrl/api/requests/$requestId');
+      final res = await http.get(
+        uri,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final raw = data['data'] ?? data;
+        return ServiceRequest.fromJson(raw as Map<String, dynamic>);
+      }
+      return null;
+    } catch (e) {
+      error = 'Network error: $e';
       return null;
     }
   }

@@ -182,4 +182,50 @@ class ClientViewModel extends ChangeNotifier {
     await _storage.delete(key: 'token');
     notifyListeners();
   }
+    /// ✅ RESEND EMAIL OTP
+  Future<bool> resendEmailOtp() async {
+    if (tempId == null) {
+      _setError("temp_id manquant. Fais start() d'abord.");
+      return false;
+    }
+
+    _setLoading(true);
+    _setError(null);
+
+    try {
+      await _post('/api/register/user/resend-email', {
+        'temp_id': tempId,
+      });
+      return true;
+    } catch (e) {
+      _setError(e.toString().replaceFirst('Exception: ', ''));
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// ✅ RESEND PHONE OTP
+  Future<bool> resendPhoneOtp() async {
+    if (tempId == null) {
+      _setError("temp_id manquant. Fais start() d'abord.");
+      return false;
+    }
+
+    _setLoading(true);
+    _setError(null);
+
+    try {
+      await _post('/api/register/user/resend-phone', {
+        'temp_id': tempId,
+      });
+      return true;
+    } catch (e) {
+      _setError(e.toString().replaceFirst('Exception: ', ''));
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
 }

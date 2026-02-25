@@ -326,7 +326,9 @@ class PlanCard extends StatelessWidget {
               width: double.infinity,
               height: 46,
               child: ElevatedButton(
-                onPressed: () {},
+                onPressed: () {
+                  Navigator.pushNamed(context, '/home/client');
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: mainColor,
                   shape: RoundedRectangleBorder(

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:my_app/view/core/app_colors.dart';
+import 'package:my_app/utils/responsive.dart';
+import 'package:my_app/view/artisan/Home/official.dart';
+// ✅ from lib/utils
 
 class SubscriptionPlans extends StatefulWidget {
   const SubscriptionPlans({super.key});
@@ -13,8 +16,7 @@ class SubscriptionPlans extends StatefulWidget {
 class _SubscriptionPlansState extends State<SubscriptionPlans> {
   late final PageController _pc;
 
-  // toggle state
-  bool yearly = true; // Annuel selected by default (like your screenshot)
+  bool yearly = true;
 
   @override
   void initState() {
@@ -30,196 +32,212 @@ class _SubscriptionPlansState extends State<SubscriptionPlans> {
 
   void _setPlanMode(bool isYearly) {
     setState(() => yearly = isYearly);
-
-    // (Optionnel) tu peux aussi changer les prix ici si tu veux
-    // مثال: mensual vs annuel
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          // ===== Background =====
-          Positioned.fill(child: Container(color: Colors.white)),
-          Positioned.fill(
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  stops: [0.3146, 1],
-                  colors: [
-                    Color.fromRGBO(255, 140, 91, 0),
-                    Color.fromRGBO(255, 140, 91, 0.30),
-                  ],
+    return LayoutBuilder(
+      builder: (context, c) {
+        Responsive.init(c);
+        double R(double v) => Responsive.s(v);
+
+        // center helper
+        double cx(double figmaW) => (c.maxWidth - R(figmaW)) / 2;
+
+        return Scaffold(
+          body: Stack(
+            children: [
+              // ===== Background =====
+              Positioned.fill(child: Container(color: Colors.white)),
+              Positioned.fill(
+                child: Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      stops: [0.3146, 1],
+                      colors: [
+                        Color.fromRGBO(255, 140, 91, 0),
+                        Color.fromRGBO(255, 140, 91, 0.30),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
 
-          // ===== FRAME =====
-          SafeArea(
-            child: SizedBox(
-              width: 393,
-              height: 852,
-              child: Stack(
-                children: [
-                  // ===== LOGO =====
-                  Positioned(
-                    top: 79,
-                    left: 116.65,
-                    child: SvgPicture.asset(
-                      'images/Exclude.svg',
-                      width: 158.693359375,
-                      height: 37,
-                    ),
-                  ),
-
-                  // ===== TITLE =====
-                  Positioned(
-                    top: 140,
-                    left: 20,
-                    child: SizedBox(
-                      width: 352,
-                      height: 23,
-                      child: Text(
-                        "Choisissez votre abonnement",
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.poppins(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textDark,
-                          letterSpacing: -0.45,
+              SafeArea(
+                child: SizedBox(
+                  width: double.infinity,
+                  height: c.maxHeight,
+                  child: Stack(
+                    children: [
+                      // ===== LOGO (centered) =====
+                      Positioned(
+                        top: R(79),
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: SvgPicture.asset(
+                            'images/Exclude.svg',
+                            width: R(158.693359375),
+                            height: R(37),
+                            fit: BoxFit.contain,
+                          ),
                         ),
                       ),
-                    ),
-                  ),
 
-                  // ===== TOGGLE (Mensuel / Annuel) =====
-                  Positioned(
-                    top: 187,
-                    left: 109,
-                    child: Container(
-                      width: 174.84375,
-                      height: 34.629173278808594,
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(30),
-                        border: Border.all(color: AppColors.primary),
-                        color: Colors.white.withOpacity(0.0),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _toggle(
-                              text: "Mensuel",
-                              active: !yearly,
-                              onTap: () => _setPlanMode(false),
+                      // ===== TITLE (centered) =====
+                      Positioned(
+                        top: R(140),
+                        left: cx(352),
+                        child: SizedBox(
+                          width: R(352),
+                          child: Text(
+                            "Choisissez votre abonnement",
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.poppins(
+                              fontSize: R(20),
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.textDark,
+                              letterSpacing: -0.45,
                             ),
                           ),
-                          Expanded(
-                            child: _toggle(
-                              text: "Annuel",
-                              active: yearly,
-                              onTap: () => _setPlanMode(true),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // ===== PLANS (SCROLL HORIZONTAL) =====
-                  Positioned(
-                    top: 234,
-                    left: 0,
-                    right: 0,
-                    child: SizedBox(
-                      height: 571,
-                      width: 393,
-
-                      // IMPORTANT: ensure drag gestures are caught
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onHorizontalDragStart: (_) {},
-                        child: PageView(
-                          controller: _pc,
-                          physics: const BouncingScrollPhysics(),
-                          clipBehavior: Clip.none,
-                          padEnds: false,
-
-                          // OPTIONAL: if you want a small "snap" feeling
-                          pageSnapping: true,
-
-                          children: [
-                            PlanCard(
-                              title: "Basic",
-                              subtitle: "Pour démarrer votre activité",
-                              price: "0",
-                              buttonText: "Choisir Basic",
-                              mainColor: AppColors.grey800Color,
-                              isFree: true,
-                            ),
-                            PlanCard(
-                              title: "Pro",
-                              subtitle: "Pour booster votre visibilité",
-                              price: yearly ? "300" : "30", // مثال
-                              buttonText: "Choisir Pro",
-                              mainColor: AppColors.primary,
-                            ),
-                            PlanCard(
-                              title: "Premium",
-                              subtitle: "Pour dominer votre marché",
-                              price: yearly ? "750" : "75", // مثال
-                              buttonText: "Choisir Premium",
-                              mainColor: const Color(0xFF2563EB),
-                            ),
-                          ],
                         ),
                       ),
-                    ),
-                  ),
 
-                  // ===== HOME INDICATOR =====
-                  Positioned(
-                    top: 837,
-                    left: 129,
-                    child: SvgPicture.asset(
-                      'images/HomeIndicator.svg',
-                      width: 134,
-                      height: 5,
-                    ),
+                      // ===== TOGGLE (centered) =====
+                      Positioned(
+                        top: R(187),
+                        left: cx(174.84375),
+                        child: Container(
+                          width: R(174.84375),
+                          height: R(34.629173278808594),
+                          padding: EdgeInsets.all(R(4)),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(R(30)),
+                            border: Border.all(color: AppColors.primary),
+                            color: Colors.white.withOpacity(0.0),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: _toggle(
+                                  R: R,
+                                  text: "Mensuel",
+                                  active: !yearly,
+                                  onTap: () => _setPlanMode(false),
+                                ),
+                              ),
+                              Expanded(
+                                child: _toggle(
+                                  R: R,
+                                  text: "Annuel",
+                                  active: yearly,
+                                  onTap: () => _setPlanMode(true),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // ===== PLANS (PageView) =====
+                      Positioned(
+                        top: R(234),
+                        left: 0,
+                        right: 0,
+                        child: SizedBox(
+                          height: (c.maxHeight - R(234) - R(30)).clamp(
+                            R(420),
+                            R(700),
+                          ),
+                          width: double.infinity,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onHorizontalDragStart: (_) {},
+                            child: PageView(
+                              controller: _pc,
+                              physics: const BouncingScrollPhysics(),
+                              clipBehavior: Clip.none,
+                              padEnds: false,
+                              pageSnapping: true,
+                              children: [
+                                PlanCard(
+                                  R: R,
+                                  title: "Basic",
+                                  subtitle: "Pour démarrer votre activité",
+                                  price: "0",
+                                  buttonText: "Choisir Basic",
+                                  mainColor: AppColors.grey800Color,
+                                  isFree: true,
+                                ),
+                                PlanCard(
+                                  R: R,
+                                  title: "Pro",
+                                  subtitle: "Pour booster votre visibilité",
+                                  price: yearly ? "300" : "30",
+                                  buttonText: "Choisir Pro",
+                                  mainColor: AppColors.primary,
+                                ),
+                                PlanCard(
+                                  R: R,
+                                  title: "Premium",
+                                  subtitle: "Pour dominer votre marché",
+                                  price: yearly ? "750" : "75",
+                                  buttonText: "Choisir Premium",
+                                  mainColor: const Color(0xFF2563EB),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // ===== HOME INDICATOR (centered bottom) =====
+                      Positioned(
+                        bottom: R(12),
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: SvgPicture.asset(
+                            'images/HomeIndicator.svg',
+                            width: R(134),
+                            height: R(5),
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  // ===== CLEAN TOGGLE (clickable) =====
   Widget _toggle({
+    required double Function(double) R,
     required String text,
     required bool active,
     required VoidCallback onTap,
   }) {
     return InkWell(
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(R(20)),
       onTap: onTap,
       child: Container(
         height: double.infinity,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: active ? AppColors.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(R(20)),
         ),
         child: Text(
           text,
           style: GoogleFonts.poppins(
-            fontSize: 9.55,
+            fontSize: R(9.55),
             fontWeight: FontWeight.w400,
             color: active ? AppColors.white : AppColors.textLight,
           ),
@@ -230,10 +248,12 @@ class _SubscriptionPlansState extends State<SubscriptionPlans> {
 }
 
 // ===========================================================
-// PlanCard (ton code, inchangé sauf si tu veux + features list)
+// PlanCard (responsive)
 // ===========================================================
 
 class PlanCard extends StatelessWidget {
+  final double Function(double) R;
+
   final String title;
   final String subtitle;
   final String price;
@@ -243,6 +263,7 @@ class PlanCard extends StatelessWidget {
 
   const PlanCard({
     super.key,
+    required this.R,
     required this.title,
     required this.subtitle,
     required this.price,
@@ -254,83 +275,94 @@ class PlanCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(left: 20, right: 10),
+      padding: EdgeInsets.only(left: R(20), right: R(10)),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(18, 22, 18, 18),
+        padding: EdgeInsets.fromLTRB(R(18), R(22), R(18), R(18)),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(26),
+          borderRadius: BorderRadius.circular(R(26)),
           border: Border.all(
             color: isFree ? const Color(0xFFE5E7EB) : AppColors.primary,
-            width: 2,
+            width: R(2),
           ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(.12),
-              blurRadius: 10,
-              offset: const Offset(0, 6),
+              blurRadius: R(10),
+              offset: Offset(0, R(6)),
             ),
           ],
         ),
         child: Column(
           children: [
             Container(
-              width: 66,
-              height: 66,
+              width: R(66),
+              height: R(66),
               decoration: BoxDecoration(
                 color: mainColor,
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(R(18)),
               ),
-              child: const Icon(Icons.check, color: Colors.white, size: 28),
+              child: Icon(Icons.check, color: Colors.white, size: R(28)),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: R(12)),
             Text(
               title,
               style: GoogleFonts.poppins(
-                fontSize: 18,
+                fontSize: R(18),
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 6),
+            SizedBox(height: R(6)),
             Text(
               subtitle,
               textAlign: TextAlign.center,
               style: GoogleFonts.poppins(
-                fontSize: 12,
+                fontSize: R(12),
                 color: AppColors.textLight,
               ),
             ),
-            const SizedBox(height: 18),
+            SizedBox(height: R(18)),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   price,
                   style: GoogleFonts.poppins(
-                    fontSize: 42,
+                    fontSize: R(42),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(width: 6),
-                Text(
-                  isFree ? "MAD/Gratuit" : "MAD",
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    color: AppColors.textLight,
-                  ),
+                SizedBox(width: R(6)),
+               Text(
+                    isFree ? "MAD/Gratuit" : "MAD",
+                    style: GoogleFonts.poppins(
+                      fontSize: R(16),
+                      color: AppColors.textLight,
+                    ),
+                
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: R(16)),
             SizedBox(
               width: double.infinity,
-              height: 46,
+              height: R(46),
               child: ElevatedButton(
-                onPressed: () {},
+                onPressed: () {
+
+{
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (_) => const HomePage()),
+                    );
+                  }
+
+
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: mainColor,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: BorderRadius.circular(R(18)),
                   ),
                 ),
                 child: Text(
@@ -338,11 +370,12 @@ class PlanCard extends StatelessWidget {
                   style: GoogleFonts.poppins(
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
+                    fontSize: R(14),
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: R(14)),
             _feature("Profil de base", true),
             _feature("Jusqu'à 5 demandes / mois", true),
             _feature("Support client standard", true),
@@ -359,20 +392,20 @@ class PlanCard extends StatelessWidget {
 
   Widget _feature(String text, bool enabled) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: EdgeInsets.symmetric(vertical: R(4)),
       child: Row(
         children: [
           Icon(
             enabled ? Icons.check_circle : Icons.cancel,
-            size: 18,
+            size: R(18),
             color: enabled ? Colors.green : Colors.grey,
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: R(8)),
           Expanded(
             child: Text(
               text,
               style: GoogleFonts.poppins(
-                fontSize: 12,
+                fontSize: R(12),
                 color: enabled ? AppColors.textDark : Colors.grey,
               ),
             ),

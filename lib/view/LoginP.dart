@@ -3,8 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:my_app/view/core/app_colors.dart';
 import 'package:my_app/viewmodels/UserViewModel.dart';
-import  'package:provider/provider.dart';
-
+import 'package:provider/provider.dart';
+import 'package:my_app/utils/responsive.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -16,7 +16,6 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final emailCtrl = TextEditingController();
   final passwordCtrl = TextEditingController();
-
   final _formKey = GlobalKey<FormState>();
   bool _obscure = true;
 
@@ -27,95 +26,100 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  // ✅ Replace this with your real login method (API / Provider)
   Future<void> login(String email, String password) async {
-    // TODO: call your backend/provider here
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final ok = await auth.login(email, password);
 
- final auth = Provider.of<AuthProvider>(context, listen: false);
+    if (!mounted) return;
 
-  final ok = await auth.login(email, password);
-
-  if (!mounted) return;
-
-  if (ok) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Login réussi")),
-    );
-    Navigator.pushReplacementNamed(context, '/home'); // عدل route إذا لازم
-  } else {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(auth.error ?? "Login failed")),
-    );
-  }
-
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Login réussi")),
+      );
+      Navigator.pushReplacementNamed(context, '/home/client');
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(auth.error ?? "Login failed")),
+      );
+    }
   }
 
   InputDecoration _figmaDec(String hint, {Widget? suffixIcon}) {
     const borderColor = Color(0xFFFC5A15);
 
     OutlineInputBorder border(double width) => OutlineInputBorder(
-          borderRadius: BorderRadius.circular(30),
+          borderRadius: BorderRadius.circular(Responsive.s(30)),
           borderSide: BorderSide(color: borderColor, width: width),
         );
 
     return InputDecoration(
       hintText: hint,
       hintStyle: GoogleFonts.poppins(
-        fontSize: 12,
+        fontSize: Responsive.s(12),
         fontWeight: FontWeight.w400,
         color: AppColors.textLight,
       ),
       filled: true,
       fillColor: Colors.transparent,
-      contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      contentPadding: EdgeInsets.symmetric(
+        vertical: Responsive.s(12),
+        horizontal: Responsive.s(16),
+      ),
       enabledBorder: border(1),
       focusedBorder: border(2),
       suffixIcon: suffixIcon,
     );
   }
 
-  Widget _pillButton({
-    required double top,
+  Widget _socialButton({
+    required double Function(double) R,
+    required Widget leftIcon,
     required String text,
-    required Color bg,
-    required Color fg,
     required VoidCallback onTap,
-    Widget? leftIcon,
+    required Color bg,
+    required Color textColor,
+    bool shadow = true,
   }) {
-    return Positioned(
-      top: top,
-      left: 30,
-      child: SizedBox(
-        width: 333,
-        height: 54,
-        child: Material(
-          color: bg,
-          borderRadius: BorderRadius.circular(30),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(30),
-            onTap: onTap,
-            child: Stack(
+    return SizedBox(
+      width: double.infinity, // responsive full width
+      height: R(54),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(R(30)),
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: R(18)),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(R(30)),
+              boxShadow: shadow
+                  ? [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: R(18),
+                        offset: Offset(0, R(8)),
+                      ),
+                    ]
+                  : [],
+            ),
+            child: Row(
               children: [
-                if (leftIcon != null)
-                  Positioned(
-                    left: 18,
-                    top: 0,
-                    bottom: 0,
-                    child: Center(child: leftIcon),
-                  ),
-                Center(
+                SizedBox(width: R(6)),
+                SizedBox(width: R(26), height: R(26), child: Center(child: leftIcon)),
+                SizedBox(width: R(12)),
+                Expanded(
                   child: Text(
-                    text,
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      height: 1.0,
-                      letterSpacing: 0,
-                      color: fg,
+                    text,
+                    style: GoogleFonts.publicSans(
+                      fontSize: R(15.2),
+                      fontWeight: FontWeight.bold,
+                      color: textColor,
                     ),
                   ),
                 ),
+                SizedBox(width: R(26)),
               ],
             ),
           ),
@@ -124,329 +128,235 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
+  Widget _gmailIcon(double Function(double) R) =>
+      Image.asset('images/gmail.png', width: R(22), height: R(22), fit: BoxFit.contain);
+
+  Widget _facebookIcon(double Function(double) R) =>
+      Image.asset('images/facebook.png', width: R(22), height: R(22), fit: BoxFit.contain);
+
+  Widget _emailIcon(double Function(double) R) =>
+      Image.asset('images/email.png', width: R(22), height: R(22), fit: BoxFit.contain);
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          // ===== Background layer 1 (white) =====
-          Positioned.fill(child: Container(color: Colors.white)),
+    return LayoutBuilder(builder: (context, c) {
+      Responsive.init(c);
+      double R(double v) => Responsive.s(v);
 
-          // ===== Background layer 2 (vertical gradient) =====
-          Positioned.fill(
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  stops: [0.3146, 1.0],
-                  colors: [
-                    Color.fromRGBO(255, 140, 91, 0.0),
-                    Color.fromRGBO(255, 140, 91, 0.30),
-                  ],
+      return Scaffold(
+        body: Stack(
+          children: [
+            Positioned.fill(child: Container(color: Colors.white)),
+            Positioned.fill(
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    stops: [0.3146, 1.0],
+                    colors: [
+                      Color.fromRGBO(255, 140, 91, 0.0),
+                      Color.fromRGBO(255, 140, 91, 0.30),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-
-          // ===== UI =====
-          SafeArea(
-            child: SingleChildScrollView(
-              child: SizedBox(
-                width: 393, // Figma frame
-                height: 852, // Figma frame
-                child: Stack(
-                  children: [
-                    // ===== LOGO (Figma) =====
-                    Positioned(
-                      top: 113,
-                      left: 86,
-                      child: Opacity(
-                        opacity: 1,
-                        child: Transform.rotate(
-                          angle: 0,
-                          child: SvgPicture.asset(
-                            'images/Exclude.svg',
-                            width: 220,
-                            height: 51.2939453125,
-                            fit: BoxFit.contain,
-                          ),
+        SafeArea(
+  child: SingleChildScrollView(
+    child: ConstrainedBox(
+      constraints: BoxConstraints(
+        minHeight: MediaQuery.of(context).size.height,
+      ),
+      child: IntrinsicHeight(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: R(20)),
+          child: Column( 
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      SizedBox(height: R(50)),
+                      SvgPicture.asset(
+                        'images/Exclude.svg',
+                        width: R(220),
+                        height: R(51),
+                      ),
+                      SizedBox(height: R(30)),
+                      Text(
+                        "Bienvenue à nouveau",
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.poppins(
+                          fontSize: R(28),
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.grey800Color,
                         ),
                       ),
-                    ),
+                      SizedBox(height: R(40)),
 
-                    // ===== TITLE (Figma) =====
-                    Positioned(
-                      top: 197,
-                      left: 46,
-                      child: SizedBox(
-                        width: 301,
-                        height: 32,
-                        child: Align(
-                          alignment: Alignment.center,
-                          child: Text(
-                            "Bienvenue à nouveau",
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.poppins(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w500,
-                              height: 38 / 24,
-                              letterSpacing: -0.45,
-                              color: AppColors.grey800Color,
+                      Form(
+                        key: _formKey,
+                        child: Column(
+                          children: [
+                            TextFormField(
+                              controller: emailCtrl,
+                              validator: (v) =>
+                                  (v == null || v.trim().isEmpty) ? "Email requis" : null,
+                              decoration: _figmaDec("Email"),
+                              style: GoogleFonts.poppins(
+                                fontSize: R(14),
+                                fontWeight: FontWeight.w400,
+                                color: AppColors.textDark,
+                              ),
                             ),
-                          ),
+                            SizedBox(height: R(20)),
+                            TextFormField(
+                              controller: passwordCtrl,
+                              obscureText: _obscure,
+                              validator: (v) =>
+                                  (v == null || v.isEmpty) ? "Mot de passe requis" : null,
+                              decoration: _figmaDec(
+                                "Mot de passe",
+                                suffixIcon: IconButton(
+                                  splashRadius: R(18),
+                                  onPressed: () => setState(() => _obscure = !_obscure),
+                                  icon: Icon(
+                                    _obscure
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                    size: R(18),
+                                    color: const Color(0xFFFC5A15),
+                                  ),
+                                ),
+                              ),
+                              style: GoogleFonts.poppins(
+                                fontSize: R(14),
+                                fontWeight: FontWeight.w400,
+                                color: AppColors.textDark,
+                              ),
+                            ),
+                            SizedBox(height: R(10)),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: InkWell(
+                                onTap: () {},
+                                child: Text(
+                                  "Mot de passe oublié ?",
+                                  style: GoogleFonts.poppins(
+                                    fontSize: R(11.5),
+                                    fontWeight: FontWeight.w400,
+                                    decoration: TextDecoration.underline,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: R(30)),
+                            SizedBox(
+                              width: double.infinity,
+                              height: R(44),
+                              child: ElevatedButton(
+                                onPressed: () async {
+                                  if (!(_formKey.currentState?.validate() ?? false)) return;
+                                  await login(emailCtrl.text.trim(), passwordCtrl.text);
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFFC5A15),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(R(30)),
+                                  ),
+                                ),
+                                child: Text(
+                                  "Login",
+                                  style: GoogleFonts.poppins(
+                                    fontSize: R(14),
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
+                      SizedBox(height: R(30)),
 
-                    // ✅ FORM LOGIN (same style as before)
-                    Form(
-                      key: _formKey,
-                      child: Stack(
+                      // SOCIAL BUTTONS (responsive full width)
+                      Column(
                         children: [
-                          // EMAIL
-                          Positioned(
-                            top: 273,
-                            left: 40,
-                            child: SizedBox(
-                              width: 314,
-                              height: 48,
-                              child: TextFormField(
-                                controller: emailCtrl,
-                                validator: (v) => (v == null || v.trim().isEmpty)
-                                    ? "Email requis"
-                                    : null,
-                                decoration: _figmaDec("Email"),
-                                style: GoogleFonts.poppins(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w400,
-                                  color: AppColors.textDark,
-                                ),
-                              ),
+                          _socialButton(
+                            R: R,
+                            leftIcon: _emailIcon(R),
+                            text: "S'inscrire avec l'application",
+                            onTap: () => Navigator.pushReplacementNamed(context, '/connect'),
+                            bg: const Color(0xFF2F3338),
+                            textColor: Colors.white,
+                            shadow: false,
+                          ),
+                          SizedBox(height: R(20)),
+                          _socialButton(
+                            R: R,
+                            leftIcon: _gmailIcon(R),
+                            text: "Se connecter avec Gmail",
+                            onTap: () =>
+                                Navigator.pushReplacementNamed(context, '/connectgoogle'),
+                            bg: Colors.white,
+                            textColor: Colors.black,
+                            shadow: true,
+                          ),
+                          SizedBox(height: R(20)),
+                          _socialButton(
+                            R: R,
+                            leftIcon: _facebookIcon(R),
+                            text: "Se connecter avec Facebook",
+                            onTap: () {},
+                            bg: Colors.white,
+                            textColor: Colors.black,
+                            shadow: true,
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: R(30)),
+
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            "Je n'ai pas un compte ?  ",
+                            style: GoogleFonts.poppins(
+                              fontSize: R(12),
+                              fontWeight: FontWeight.w400,
+                              color: Colors.black,
                             ),
                           ),
-
-                          // PASSWORD
-                          Positioned(
-                            top: 343,
-                            left: 40,
-                            child: SizedBox(
-                              width: 314,
-                              height: 48,
-                              child: TextFormField(
-                                controller: passwordCtrl,
-                                obscureText: _obscure,
-                                validator: (v) => (v == null || v.isEmpty)
-                                    ? "Mot de passe requis"
-                                    : null,
-                                decoration: _figmaDec(
-                                  "Mot de passe",
-                                  suffixIcon: IconButton(
-                                    splashRadius: 18,
-                                    onPressed: () {
-                                      setState(() => _obscure = !_obscure);
-                                    },
-                                    icon: Icon(
-                                      _obscure
-                                          ? Icons.visibility_off_outlined
-                                          : Icons.visibility_outlined,
-                                      size: 18,
-                                      color: const Color(0xFFFC5A15),
-                                    ),
-                                  ),
-                                ),
-                                style: GoogleFonts.poppins(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w400,
-                                  color: AppColors.textDark,
-                                ),
-                              ),
-                            ),
-                          ),
-
-                          // LOGIN BUTTON
-                          Positioned(
-                            top: 455,
-                            left: 97,
-                            child: SizedBox(
-                              width: 199,
-                              height: 44,
-                              child: Material(
+                          GestureDetector(
+                            onTap: () => Navigator.pushNamed(context, '/connect'),
+                            child: Text(
+                              "S'inscrire",
+                              style: GoogleFonts.poppins(
+                                fontSize: R(12),
+                                fontWeight: FontWeight.w500,
                                 color: const Color(0xFFFC5A15),
-                                borderRadius: BorderRadius.circular(30),
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(30),
-                                  onTap: () async {
-                                    if (!(_formKey.currentState?.validate() ?? false)) return;
-
-                                    final email = emailCtrl.text.trim();
-                                    final password = passwordCtrl.text;
-
-                                    try {
-                                      await login(email, password);
-
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text("Login réussi")),
-                                      );
-                                    } catch (e) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text("Erreur login: $e")),
-                                      );
-                                    }
-                                  },
-                                  child: Center(
-                                    child: Text(
-                                      "Login",
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                ),
                               ),
                             ),
                           ),
                         ],
                       ),
-                    ),
-
-                    // ===== SOCIAL / FOOTER FRAME (FIGMA EXACT) =====
-                    Positioned(
-                      top: 551,
-                      left: 6,
-                      child: Container(
-                        width: 381,
-                        height: 301,
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.only(
-                            topLeft: Radius.circular(30),
-                            topRight: Radius.circular(30),
-                          ),
-                        ),
-                        child: Stack(
-                          children: [
-                            // ===== SVG 1 =====
-                            Positioned(
-                              top: 30,
-                              left: 33,
-                              child: InkWell(
-                                onTap: () {
-
-  Navigator.pushReplacementNamed(context, '/connect'); // 
-                                  
-                                },
-                                child: SvgPicture.asset(
-                                  'images/Group75902.svg',
-                                  width: 333,
-                                  height: 54,
-                                  fit: BoxFit.contain,
-                                ),
-                              ),
-                            ),
-
-                            // ===== SVG 2 =====
-                            Positioned(
-                              top: 104,
-                              left: 24,
-                              child: InkWell(
-                                onTap: () {
-                                 
-                                },
-                                child: Image.asset(
-                                  'images/Group75903.png',
-                                  fit: BoxFit.contain,
-                                ),
-                              ),
-                            ),
-
-                            // ===== SVG 3 =====
-                            Positioned(
-                              top: 174,
-                              left: 24,
-                              child: InkWell(
-                                onTap: () {},
-                              
-                                 child:SvgPicture.asset(
-                                  'images/Group75957.svg',
-                                  
-                                  fit: BoxFit.contain,
-                                ),
-                              
-                              ),
-                            ),
-                          ],
-                        ),
+                      SizedBox(height: R(20)),
+                      SvgPicture.asset(
+                        'images/HomeIndicator.svg',
+                        width: R(134),
+                        height: R(5),
                       ),
-                    ),
-
-                    // ===== FOOTER =====
-                    Positioned(
-                      top: 815,
-                      left: 0,
-                      child: SizedBox(
-                        width: 393,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              "Je nais pas un compte ?  ",
-                              style: GoogleFonts.poppins(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w400,
-                                color: Colors.black,
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.pushNamed(context, '/connect');
-                              },
-                              child: Text(
-                                "S'inscrire",
-                                style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: const Color(0xFFFC5A15),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    Positioned(
-                      top: 837,
-                      left: 129,
-                      child: Container(
-                        decoration: ShapeDecoration(
-                          color: AppColors.textDark,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(100),
-                          ),
-                        ),
-                        child: InkWell(
-                          onTap: () {
-                            print("InkWell tapped!");
-                          },
-                          child: SvgPicture.asset(
-                            'images/HomeIndicator.svg',
-                            width: 134,
-                            height: 5,
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+        
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
-      ),
-    );
+  ),
+        ),
+          ],
+        ),
+        );
+      });
   }
 }

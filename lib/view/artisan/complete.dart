@@ -1,14 +1,20 @@
-import 'dart:convert';
+// auth_flow_page.dart (FULL) ✅ Web + Mobile (universal_html + image_picker)
+// Uses ArtisanViewModel for ALL API calls (start/verify/complete-profile/set-password)
+// Also supports picking Diplome + Images on Web + Mobile.
+
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
+import 'package:universal_html/html.dart' as html;
 
 import 'package:my_app/view/core/app_colors.dart';
+import 'package:my_app/utils/responsive.dart';
+import 'package:my_app/viewmodels/artisan_view_model.dart';
 import 'plan.dart';
 
 // =====================================================
@@ -46,44 +52,38 @@ class AuthFlowPage extends StatefulWidget {
 
 class _AuthFlowPageState extends State<AuthFlowPage> {
   AuthStep step = AuthStep.verify;
-
-  // ✅ choose only one
   VerifyTarget target = VerifyTarget.email;
 
-  // otp
   final otp0 = TextEditingController();
   final otp1 = TextEditingController();
   final otp2 = TextEditingController();
   final otp3 = TextEditingController();
 
-  // password
   final pass1 = TextEditingController();
   final pass2 = TextEditingController();
 
-  // artisan info
-  final servicePrincipalCtrl = TextEditingController(); // UI only
-  final newServiceCtrl = TextEditingController(); // Type de service input
+  final servicePrincipalCtrl = TextEditingController();
+  final newServiceCtrl = TextEditingController();
   final villeCtrl = TextEditingController();
   final adresseCtrl = TextEditingController();
-  final diplomeCtrl = TextEditingController(); // UI only
+  final diplomeCtrl = TextEditingController();
 
-  // chips list
   final List<String> serviceTags = [];
-
-  // portfolio
   final descriptionCtrl = TextEditingController();
+
+  // ✅ Mobile files (dart:io)
   File? diplomeFile;
   List<File> images = [];
 
-  // IDs backend
+  // ✅ Web files (html.File)
+  html.File? diplomeFileWeb;
+  List<html.File> webImages = [];
+
   List<int> selectedServiceIds = [];
   int? servicePrincipalId;
 
-  // API
   String? tempId;
   String? finalToken;
-
-  bool isLoading = false;
 
   final _picker = ImagePicker();
 
@@ -93,16 +93,13 @@ class _AuthFlowPageState extends State<AuthFlowPage> {
     otp1.dispose();
     otp2.dispose();
     otp3.dispose();
-
     pass1.dispose();
     pass2.dispose();
-
     servicePrincipalCtrl.dispose();
     newServiceCtrl.dispose();
     villeCtrl.dispose();
     adresseCtrl.dispose();
     diplomeCtrl.dispose();
-
     descriptionCtrl.dispose();
     super.dispose();
   }
@@ -114,64 +111,87 @@ class _AuthFlowPageState extends State<AuthFlowPage> {
     otp3.text = "";
   }
 
-  String _baseUrl() {
-    const port = "8000";
-    if (!kIsWeb && Platform.isAndroid) return "http://10.0.2.2:$port/api";
-    return "http://127.0.0.1:$port/api";
+  String _otpValue() =>
+      "${otp0.text}${otp1.text}${otp2.text}${otp3.text}".trim();
+
+  // =====================================================
+  // WEB PICKERS
+  // =====================================================
+
+  Future<List<html.File>> _pickWebImages() async {
+    final input = html.FileUploadInputElement()
+      ..multiple = true
+      ..accept = "image/*";
+    input.click();
+    await input.onChange.first;
+    return input.files ?? <html.File>[];
   }
 
-  void _setLoading(bool v) => setState(() => isLoading = v);
+  Future<html.File?> _pickWebDiplome() async {
+    final input = html.FileUploadInputElement()
+      ..accept = "image/*,application/pdf";
+    input.click();
+    await input.onChange.first;
+    final files = input.files;
+    if (files == null || files.isEmpty) return null;
+    return files.first;
+  }
 
-  String _otpValue() => "${otp0.text}${otp1.text}${otp2.text}${otp3.text}".trim();
+  // =====================================================
+  // UNIVERSAL PICKERS (WEB + MOBILE)
+  // =====================================================
 
-  String _extractMessage(String body) {
-    try {
-      final j = jsonDecode(body);
-      if (j is Map && j["message"] is String) return j["message"];
-      if (j is Map && j["errors"] is Map) {
-        final errors = j["errors"] as Map;
-        final k = errors.keys.first;
-        final v = errors[k];
-        if (v is List && v.isNotEmpty) return v.first.toString();
-      }
-      return body;
-    } catch (_) {
-      return body;
+  Future<void> _pickDiplomeUniversal() async {
+    if (kIsWeb) {
+      final f = await _pickWebDiplome();
+      if (f == null) return;
+      setState(() {
+        diplomeFileWeb = f;
+        diplomeCtrl.text = f.name;
+      });
+    } else {
+      final x = await _picker.pickImage(source: ImageSource.gallery);
+      if (x == null) return;
+      setState(() {
+        diplomeFile = File(x.path);
+        diplomeCtrl.text = x.name;
+      });
     }
   }
 
-  Future<void> _pickDiplome() async {
-    final x = await _picker.pickImage(source: ImageSource.gallery);
-    if (x == null) return;
-    setState(() => diplomeFile = File(x.path));
+  Future<void> _pickImagesUniversal() async {
+    if (kIsWeb) {
+      final list = await _pickWebImages();
+      if (list.isEmpty) return;
+      setState(() => webImages.addAll(list));
+    } else {
+      final picked = await _picker.pickMultiImage();
+      if (picked.isEmpty) return;
+      setState(() => images.addAll(picked.map((e) => File(e.path))));
+    }
   }
 
-  Future<void> _pickImages() async {
-    final picked = await _picker.pickMultiImage();
-    if (picked.isEmpty) return;
-    setState(() => images.addAll(picked.map((e) => File(e.path))));
-  }
+  // =====================================================
+  // NAV
+  // =====================================================
 
-  // ✅ PRECEDENT logic
   void _prev() {
     setState(() {
       switch (step) {
         case AuthStep.verify:
           break;
-
         case AuthStep.otpEmail:
         case AuthStep.otpPhone:
           step = AuthStep.verify;
           break;
-
         case AuthStep.artisanInfo:
-          step = (target == VerifyTarget.email) ? AuthStep.otpEmail : AuthStep.otpPhone;
+          step = (target == VerifyTarget.email)
+              ? AuthStep.otpEmail
+              : AuthStep.otpPhone;
           break;
-
         case AuthStep.artisanPortfolio:
           step = AuthStep.artisanInfo;
           break;
-
         case AuthStep.securePassword:
           step = AuthStep.artisanPortfolio;
           break;
@@ -179,39 +199,29 @@ class _AuthFlowPageState extends State<AuthFlowPage> {
     });
   }
 
-  Future<void> _next() async {
-    try {
-      _setLoading(true);
+  // =====================================================
+  // NEXT (ALL CALLS THROUGH ArtisanViewModel)
+  // =====================================================
 
+  Future<void> _next() async {
+    final vm = context.read<ArtisanViewModel>();
+
+    try {
       // 1) START
       if (step == AuthStep.verify) {
-        final res = await http.post(
-          Uri.parse("${_baseUrl()}/register/artisan/start"),
-          headers: {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-          },
-          body: jsonEncode({
-            "nom_complet": widget.nom,
-            "email": widget.email,
-            "phone": widget.phone,
-            "date_of_birth": "2002-01-03",
-          }),
+        final ok = await vm.start(
+          name: widget.nom,
+          email: widget.email,
+          phone: widget.phone,
+          birth: widget.birth.trim(),
         );
-
-        if (res.statusCode != 201) throw Exception(_extractMessage(res.body));
-
-        final data = jsonDecode(res.body) as Map<String, dynamic>;
-        tempId = data["temp_id"]?.toString();
-
-        if (tempId == null || tempId!.isEmpty) {
-          throw Exception("temp_id non reçu depuis le backend.");
-        }
-
+        if (!ok) throw Exception(vm.error ?? "Erreur");
+        tempId = vm.tempId;
         _resetOtp();
-
         setState(() {
-          step = (target == VerifyTarget.email) ? AuthStep.otpEmail : AuthStep.otpPhone;
+          step = (target == VerifyTarget.email)
+              ? AuthStep.otpEmail
+              : AuthStep.otpPhone;
         });
         return;
       }
@@ -220,24 +230,10 @@ class _AuthFlowPageState extends State<AuthFlowPage> {
       if (step == AuthStep.otpEmail) {
         final code = _otpValue();
         if (code.length < 4) throw Exception("Entrez un code valide.");
-
-        final res = await http.post(
-          Uri.parse("${_baseUrl()}/register/artisan/verify-email"),
-          headers: {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-          },
-          body: jsonEncode({"temp_id": tempId, "code": code}),
-        );
-
-        if (res.statusCode != 200) throw Exception(_extractMessage(res.body));
-
+        final ok = await vm.verifyEmail(code);
+        if (!ok) throw Exception(vm.error ?? "Erreur");
         _resetOtp();
-
-        setState(() {
-          // if started with email => verify phone next, else go info
-          step = AuthStep.artisanInfo;
-        });
+        setState(() => step = AuthStep.artisanInfo);
         return;
       }
 
@@ -245,24 +241,10 @@ class _AuthFlowPageState extends State<AuthFlowPage> {
       if (step == AuthStep.otpPhone) {
         final code = _otpValue();
         if (code.length < 4) throw Exception("Entrez un code valide.");
-
-        final res = await http.post(
-          Uri.parse("${_baseUrl()}/register/artisan/verify-phone"),
-          headers: {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-          },
-          body: jsonEncode({"temp_id": tempId, "code": code}),
-        );
-
-        if (res.statusCode != 200) throw Exception(_extractMessage(res.body));
-
+        final ok = await vm.verifyPhone(code);
+        if (!ok) throw Exception(vm.error ?? "Erreur");
         _resetOtp();
-
-        setState(() {
-          // if started with phone => verify email next, else go info
-          step =  AuthStep.artisanInfo;
-        });
+        setState(() => step = AuthStep.artisanInfo);
         return;
       }
 
@@ -272,32 +254,24 @@ class _AuthFlowPageState extends State<AuthFlowPage> {
         return;
       }
 
-      // 5) complete profile multipart
+      // 5) complete profile multipart (web + mobile)
       if (step == AuthStep.artisanPortfolio) {
-        if (tempId == null) throw Exception("temp_id manquant.");
-
-        final req = http.MultipartRequest(
-          "POST",
-          Uri.parse("${_baseUrl()}/register/artisan/complete-profile"),
+        final ok = await vm.completeProfile(
+          ville: villeCtrl.text.trim(),
+          adresse: adresseCtrl.text.trim(),
+          diplome: diplomeCtrl.text.trim(),
+          description: descriptionCtrl.text.trim(),
+          newService: newServiceCtrl.text.trim().isEmpty
+              ? null
+              : newServiceCtrl.text.trim(),
+          servicePrincipalId: servicePrincipalId,
+          serviceIds: selectedServiceIds,
+          diplomeFile: kIsWeb ? null : diplomeFile,
+          images: kIsWeb ? null : images,
+          diplomeFileWeb: kIsWeb ? diplomeFileWeb : null,
+          imagesWeb: kIsWeb ? webImages : null,
         );
-
-        req.headers["Accept"] = "application/json";
-        req.fields["temp_id"] = tempId!;
-
-        if (villeCtrl.text.trim().isNotEmpty) req.fields["ville"] = villeCtrl.text.trim();
-        if (adresseCtrl.text.trim().isNotEmpty) req.fields["adresse"] = adresseCtrl.text.trim();
-        if (diplomeCtrl.text.trim().isNotEmpty) req.fields["diplome"] = diplomeCtrl.text.trim();
-        if (descriptionCtrl.text.trim().isNotEmpty) req.fields["description"] = descriptionCtrl.text.trim();
-
-        if (newServiceCtrl.text.trim().isNotEmpty) req.fields["new_service_name"] = newServiceCtrl.text.trim();
-        if (servicePrincipalId != null) req.fields["service_principal_id"] = servicePrincipalId.toString();
-        if (selectedServiceIds.isNotEmpty) req.fields["service_ids"] = jsonEncode(selectedServiceIds);
-
-        final streamed = await req.send();
-        final res = await http.Response.fromStream(streamed);
-
-        if (res.statusCode != 200) throw Exception(_extractMessage(res.body));
-
+        if (!ok) throw Exception(vm.error ?? "Erreur");
         setState(() => step = AuthStep.securePassword);
         return;
       }
@@ -310,25 +284,12 @@ class _AuthFlowPageState extends State<AuthFlowPage> {
         if (pass1.text.trim() != pass2.text.trim()) {
           throw Exception("Les mots de passe ne correspondent pas.");
         }
-
-        final res = await http.post(
-          Uri.parse("${_baseUrl()}/register/artisan/set-password"),
-          headers: {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-          },
-          body: jsonEncode({
-            "temp_id": tempId,
-            "password": pass1.text.trim(),
-            "password_confirmation": pass2.text.trim(),
-          }),
+        final ok = await vm.setPassword(
+          password: pass1.text.trim(),
+          confirmPassword: pass2.text.trim(),
         );
-
-        if (res.statusCode != 200) throw Exception(_extractMessage(res.body));
-
-        final data = jsonDecode(res.body) as Map<String, dynamic>;
-        finalToken = data["token"]?.toString();
-
+        if (!ok) throw Exception(vm.error ?? "Erreur");
+        finalToken = vm.token;
         if (!mounted) return;
         Navigator.pushReplacement(
           context,
@@ -338,12 +299,16 @@ class _AuthFlowPageState extends State<AuthFlowPage> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceAll("Exception:", "").trim())),
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '').trim()),
+        ),
       );
-    } finally {
-      _setLoading(false);
     }
   }
+
+  // =====================================================
+  // UI HELPERS
+  // =====================================================
 
   String _title() {
     switch (step) {
@@ -376,250 +341,328 @@ class _AuthFlowPageState extends State<AuthFlowPage> {
     return 0.0;
   }
 
-  Widget _content() {
+  Widget _content(double R(double v), double sidePadding) {
+    final vm = context.watch<ArtisanViewModel>();
+    final pickedDiplome = kIsWeb ? diplomeFileWeb != null : diplomeFile != null;
+    final imgCount = kIsWeb ? webImages.length : images.length;
+
     switch (step) {
       case AuthStep.verify:
-        return VerifyWidget(
-          email: widget.email,
-          phone: widget.phone,
-          target: target,
-          onChange: (v) => setState(() => target = v),
+        return Padding(
+          padding: EdgeInsets.symmetric(horizontal: sidePadding),
+          child: VerifyWidget(
+            email: widget.email,
+            phone: widget.phone,
+            target: target,
+            onChange: (v) => setState(() => target = v),
+          ),
         );
 
       case AuthStep.otpEmail:
-        return OtpWidget("Code envoyé par email", [otp0, otp1, otp2, otp3]);
+        return Padding(
+          padding: EdgeInsets.symmetric(horizontal: sidePadding),
+          child: OtpWidget(
+            label: "Code envoyé par email",
+            otp: [otp0, otp1, otp2, otp3],
+            onResend: vm.loading
+                ? null
+                : () async {
+                    final ok = await vm.resendEmailOtp();
+                    if (ok) _resetOtp();
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(vm.error ?? "Code renvoyé ✅")),
+                    );
+                  },
+          ),
+        );
 
       case AuthStep.otpPhone:
-        return OtpWidget("Code envoyé par SMS", [otp0, otp1, otp2, otp3]);
+        return Padding(
+          padding: EdgeInsets.symmetric(horizontal: sidePadding),
+          child: OtpWidget(
+            label: "Code envoyé par SMS",
+            otp: [otp0, otp1, otp2, otp3],
+            onResend: vm.loading
+                ? null
+                : () async {
+                    final ok = await vm.resendPhoneOtp();
+                    if (ok) _resetOtp();
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(vm.error ?? "Code renvoyé ✅")),
+                    );
+                  },
+          ),
+        );
 
       case AuthStep.artisanInfo:
-        return ArtisanInfoStep(
-          servicePrincipalCtrl: servicePrincipalCtrl,
-          newServiceCtrl: newServiceCtrl,
-          villeCtrl: villeCtrl,
-          adresseCtrl: adresseCtrl,
-          diplomeCtrl: diplomeCtrl,
-          diplomeSelected: diplomeFile != null,
-          tags: serviceTags,
-          onAddTag: () {
-            final v = newServiceCtrl.text.trim();
-            if (v.isEmpty) return;
-            setState(() {
-              serviceTags.add(v);
-              newServiceCtrl.clear();
-            });
-          },
-          onRemoveTag: (t) => setState(() => serviceTags.remove(t)),
-          onPickDiplome: _pickDiplome,
+        return Padding(
+          padding: EdgeInsets.symmetric(horizontal: sidePadding),
+          child: ArtisanInfoStep(
+            servicePrincipalCtrl: servicePrincipalCtrl,
+            newServiceCtrl: newServiceCtrl,
+            villeCtrl: villeCtrl,
+            adresseCtrl: adresseCtrl,
+            diplomeCtrl: diplomeCtrl,
+            diplomeSelected: pickedDiplome,
+            tags: serviceTags,
+            onAddTag: () {
+              final v = newServiceCtrl.text.trim();
+              if (v.isEmpty) return;
+              setState(() {
+                serviceTags.add(v);
+                newServiceCtrl.clear();
+              });
+            },
+            onRemoveTag: (t) => setState(() => serviceTags.remove(t)),
+            onPickDiplome: _pickDiplomeUniversal,
+          ),
         );
 
       case AuthStep.artisanPortfolio:
-        return ArtisanPortfolioStep(
-          descriptionCtrl: descriptionCtrl,
-          onPickImages: _pickImages,
-          imagesCount: images.length,
+        return Padding(
+          padding: EdgeInsets.symmetric(horizontal: sidePadding),
+          child: ArtisanPortfolioStep(
+            descriptionCtrl: descriptionCtrl,
+            onPickImages: _pickImagesUniversal,
+            imagesCount: imgCount,
+          ),
         );
 
       case AuthStep.securePassword:
-        return SecurePasswordWidget(pass1, pass2);
+        return Padding(
+          padding: EdgeInsets.symmetric(horizontal: sidePadding),
+          child: SecurePasswordWidget(pass1, pass2),
+        );
     }
   }
 
-  // ✅ Buttons row like screenshot
-  Widget _bottomButtons() {
-    // Row only for artisanInfo & artisanPortfolio
-    if (step == AuthStep.artisanInfo || step == AuthStep.artisanPortfolio) {
-      final rightText = step == AuthStep.artisanInfo ? "Suivant" : "Confirmer";
-
-      return Row(
-        children: [
-          Expanded(
-            child: Container(
-              height: 48,
-             
-              decoration: BoxDecoration(
-borderRadius: BorderRadius.circular(28),
- color:Colors.white,
+  Widget _bottomButtons(
+      ArtisanViewModel vm, double R(double v), double btnW) {
+    // Verify + OTP + Password → single centered button
+    if (step == AuthStep.verify ||
+        step == AuthStep.otpEmail ||
+        step == AuthStep.otpPhone ||
+        step == AuthStep.securePassword) {
+      final label = step == AuthStep.securePassword ? "Créer" : "Suivant";
+      return Center(
+        child: SizedBox(
+          width: btnW,
+          height: R(48),
+          child: ElevatedButton(
+            onPressed: vm.loading ? null : _next,
+            style: ElevatedButton.styleFrom(
+              elevation: 0,
+              backgroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(R(28)),
               ),
-              child: OutlinedButton(
-                onPressed: isLoading ? null : _prev,
-                style: OutlinedButton.styleFrom(
-                  
-                  side: const BorderSide(color: AppColors.primary, width: 1.2),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-                ),
-                child: Text(
-                  "Précédent",
-                  style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
+            ),
+            child: vm.loading
+                ? SizedBox(
+                    width: R(18),
+                    height: R(18),
+                    child: const CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Text(
+                    label,
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w700,
+                      fontSize: R(14),
+                      color: Colors.white,
+                    ),
                   ),
-                ),
-              ),
-            ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: SizedBox(
-              height: 48,
-              child: ElevatedButton(
-                onPressed: isLoading ? null : _next,
-                style: ElevatedButton.styleFrom(
-                  elevation: 0,
-                  backgroundColor: AppColors.primary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-                ),
-                child: isLoading
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                    : Text(
-                        rightText,
-                        style: GoogleFonts.poppins(fontWeight: FontWeight.w700, color: Colors.white),
-                      ),
-              ),
-            ),
-          ),
-        ],
+        ),
       );
     }
 
-    // Single button in other steps
-    final txt = (step == AuthStep.securePassword) ? "Créer" : "Suivant";
-
-    return SizedBox(
-      width: double.infinity,
-      height: 48,
-      child: ElevatedButton(
-        onPressed: isLoading ? null : _next,
-        style: ElevatedButton.styleFrom(
-          elevation: 0,
-          backgroundColor: AppColors.primary,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        ),
-        child: isLoading
-            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-            : Text(
-                txt,
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w700, color: Colors.white),
+    // Info + Portfolio → two buttons (Précédent / Suivant|Confirmer)
+    final rightText =
+        step == AuthStep.artisanInfo ? "Suivant" : "Confirmer";
+    return Row(
+      children: [
+        Expanded(
+          child: SizedBox(
+            height: R(48),
+            child: OutlinedButton(
+              onPressed: vm.loading ? null : _prev,
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppColors.primary, width: 1.2),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(R(28)),
+                ),
+                backgroundColor: Colors.white,
               ),
-      ),
+              child: Text(
+                "Précédent",
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w700,
+                  fontSize: R(14),
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ),
+        ),
+        SizedBox(width: R(16)),
+        Expanded(
+          child: SizedBox(
+            height: R(48),
+            child: ElevatedButton(
+              onPressed: vm.loading ? null : _next,
+              style: ElevatedButton.styleFrom(
+                elevation: 0,
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(R(28)),
+                ),
+              ),
+              child: vm.loading
+                  ? SizedBox(
+                      width: R(18),
+                      height: R(18),
+                      child: const CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(
+                      rightText,
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w700,
+                        fontSize: R(14),
+                        color: Colors.white,
+                      ),
+                    ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<ArtisanViewModel>();
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    // Adaptive side padding (same pattern as client version)
+    final double sidePadding = screenWidth < 400 ? 16 : 32;
+
+    // Button width: 70% of screen (single button), full minus padding for 2-btn row
+    final double btnW = screenWidth * 0.7;
+    final double twoBtnW = screenWidth - (sidePadding * 2);
+
+    Responsive.init(BoxConstraints(maxWidth: screenWidth, maxHeight: screenHeight));
+    double R(double v) => Responsive.s(v);
+
+    final bool hasTwoButtons =
+        step == AuthStep.artisanInfo || step == AuthStep.artisanPortfolio;
+
     return Scaffold(
-      body: Stack(
-        children: [
-          Positioned.fill(child: Container(color: Colors.white)),
-          Positioned.fill(
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  stops: [0.3146, 1],
-                  colors: [
-                    Color.fromRGBO(255, 140, 91, 0),
-                    Color.fromRGBO(255, 140, 91, 0.30),
-                  ],
-                ),
-              ),
-            ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            stops: [0.3146, 1.0],
+            colors: [
+              Color.fromRGBO(255, 140, 91, 0.0),
+              Color.fromRGBO(255, 140, 91, 0.30),
+            ],
           ),
-          SafeArea(
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
             child: SizedBox(
-              width: 393,
-              height: 852,
-              child: Stack(
+              height: screenHeight,
+              child: Column(
                 children: [
-                  Positioned( 
-                    top: 113,
-                    left: 86,
-                    child: SvgPicture.asset(
-                      'images/Exclude.svg',
-                      width: 220,
-                      height: 51.29,
+                  const Spacer(flex: 2),
+
+                  // Logo
+                  SvgPicture.asset(
+                    'images/Exclude.svg',
+                    width: R(220),
+                    height: R(51.29),
+                    fit: BoxFit.contain,
+                  ),
+
+                  const Spacer(flex: 1),
+
+                  // Title
+                  Text(
+                    _title(),
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      fontSize: R(24),
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textDark,
                     ),
                   ),
 
-                  Positioned(
-                    top: 203,
-                    left: 62,
-                    child: SizedBox(
-                      width: 270,
-                      child: Column(
-                        children: [
-                          Text(
-                            _title(),
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.poppins(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.textDark,
-                            ),
-                          ),
-                          if (_subtitle() != null) ...[
-                            const SizedBox(height: 10),
-                            Container(
-                              width: 240,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade300,
-                                borderRadius: BorderRadius.circular(100),
-                              ),
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                child: FractionallySizedBox(
-                                  widthFactor: _progress(),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary,
-                                      borderRadius: BorderRadius.circular(100),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              _subtitle()!,
-                              style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textDark),
-                            ),
-                          ],
-                        ],
+                  // Progress bar + subtitle (only for artisanInfo / artisanPortfolio)
+                  if (_subtitle() != null) ...[
+                    SizedBox(height: R(10)),
+                    Padding(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: sidePadding),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(R(100)),
+                        child: LinearProgressIndicator(
+                          value: _progress(),
+                          minHeight: R(6),
+                          backgroundColor: Colors.grey.shade300,
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                              AppColors.primary),
+                        ),
                       ),
                     ),
+                    SizedBox(height: R(8)),
+                    Text(
+                      _subtitle()!,
+                      style: GoogleFonts.poppins(
+                        fontSize: R(14),
+                        color: AppColors.textDark,
+                      ),
+                    ),
+                  ],
+
+                  const Spacer(flex: 1),
+
+                  // Step content
+                  SizedBox(
+                    width: double.infinity,
+                    child: _content(R, sidePadding),
                   ),
 
-                  // content
-                  Positioned(
-                    top: 330,
-                    left: 39,
-                    child: SizedBox(width: 314, child: _content()),
-                  ),
+                  const Spacer(flex: 2),
 
-                  // ✅ buttons row bottom
-                  Positioned(
-                    left: 39,
-                    right: 39,
-                    bottom: 78,
-                    child: _bottomButtons(),
-                  ),
-
-                  Positioned(
-                    bottom: 12,
-                    left: 129,
-                    child: SvgPicture.asset(
-                      'images/HomeIndicator.svg',
-                      width: 134,
-                      height: 5,
+                  // Buttons
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: sidePadding),
+                    child: SizedBox(
+                      width: hasTwoButtons ? twoBtnW : btnW,
+                      child: _bottomButtons(vm, R, btnW),
                     ),
                   ),
+
+                  const Spacer(flex: 1),
+
+                  // Home indicator
+                  SvgPicture.asset(
+                    'images/HomeIndicator.svg',
+                    width: R(134),
+                    height: R(5),
+                    fit: BoxFit.contain,
+                  ),
+
+                  const Spacer(flex: 1),
                 ],
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -645,6 +688,8 @@ class VerifyWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    double R(double v) => Responsive.s(v);
+
     return Column(
       children: [
         _tile(
@@ -653,14 +698,16 @@ class VerifyWidget extends StatelessWidget {
           icon: Icons.email_outlined,
           text: email.isEmpty ? "email@gmail.com" : email,
           onTap: () => onChange(VerifyTarget.email),
+          R: R,
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: R(16)),
         _tile(
           selected: target == VerifyTarget.phone,
           tag: "Téléphone",
           icon: Icons.phone_outlined,
           text: phone.isEmpty ? "06 xx xx xx xx" : phone,
           onTap: () => onChange(VerifyTarget.phone),
+          R: R,
         ),
       ],
     );
@@ -672,53 +719,68 @@ class VerifyWidget extends StatelessWidget {
     required IconData icon,
     required String text,
     required VoidCallback onTap,
+    required double Function(double) R,
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(30),
+      borderRadius: BorderRadius.circular(R(30)),
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           Container(
-            height: 52,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            height: R(52),
+            padding: EdgeInsets.symmetric(horizontal: R(16)),
             decoration: BoxDecoration(
               color: const Color(0xFFFFF1EB),
-              borderRadius: BorderRadius.circular(30),
+              borderRadius: BorderRadius.circular(R(30)),
               border: Border.all(color: AppColors.primary, width: 1.2),
             ),
             child: Row(
               children: [
-                Icon(icon, color: AppColors.primary, size: 18),
-                const SizedBox(width: 10),
+                Icon(icon, color: AppColors.primary, size: R(18)),
+                SizedBox(width: R(10)),
                 Expanded(
                   child: Text(
                     text,
-                    style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textDark),
+                    style: GoogleFonts.poppins(
+                      fontSize: R(13),
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textDark,
+                    ),
                   ),
                 ),
                 Container(
-                  width: 20,
-                  height: 20,
+                  width: R(20),
+                  height: R(20),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(R(4)),
                     border: Border.all(color: AppColors.primary, width: 1.2),
                     color: selected ? AppColors.primary : Colors.transparent,
                   ),
-                  child: selected ? const Icon(Icons.check, size: 14, color: Colors.white) : null,
+                  child: selected
+                      ? Icon(Icons.check, size: R(14), color: Colors.white)
+                      : null,
                 ),
               ],
             ),
           ),
           Positioned(
-            left: 18,
-            top: -8,
+            left: R(18),
+            top: -R(8),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-              decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(16)),
+              padding:
+                  EdgeInsets.symmetric(horizontal: R(10), vertical: R(2)),
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(R(16)),
+              ),
               child: Text(
                 tag,
-                style: GoogleFonts.poppins(fontSize: 10, color: Colors.white, fontWeight: FontWeight.w600),
+                style: GoogleFonts.poppins(
+                  fontSize: R(10),
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),
@@ -728,49 +790,80 @@ class VerifyWidget extends StatelessWidget {
   }
 }
 
+// =====================================================
+// OTP
+// =====================================================
+
 class OtpWidget extends StatelessWidget {
   final String label;
   final List<TextEditingController> otp;
+  final VoidCallback? onResend;
 
-  const OtpWidget(this.label, this.otp, {super.key});
+  const OtpWidget({
+    super.key,
+    required this.label,
+    required this.otp,
+    this.onResend,
+  });
 
   @override
   Widget build(BuildContext context) {
+    double R(double v) => Responsive.s(v);
+
     return Column(
       children: [
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: otp.map(_box).toList()),
-        const SizedBox(height: 14),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: otp.map((c) => _box(c, R)).toList(),
+        ),
+        SizedBox(height: R(14)),
         Container(
           width: double.infinity,
-          height: 48,
-          alignment: Alignment.center,
+          padding: EdgeInsets.symmetric(vertical: R(12)),
           decoration: BoxDecoration(
             border: Border.all(color: AppColors.primary),
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(R(28)),
           ),
-          child: Text(label, style: const TextStyle(fontSize: 12)),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(fontSize: R(12)),
+          ),
         ),
-        const SizedBox(height: 14),
-        const Text(
-          "Renvoyer",
-          style: TextStyle(decoration: TextDecoration.underline, fontWeight: FontWeight.w600),
+        SizedBox(height: R(14)),
+        TextButton(
+          onPressed: onResend,
+          child: Text(
+            "Renvoyer",
+            style: GoogleFonts.poppins(
+              decoration: TextDecoration.underline,
+              fontWeight: FontWeight.w600,
+              fontSize: R(12),
+              color: AppColors.textDark,
+            ),
+          ),
         ),
       ],
     );
   }
 
-  Widget _box(TextEditingController c) {
-    return SizedBox(
-      width: 48,
-      height: 48,
+  Widget _box(TextEditingController c, double Function(double) R) {
+    return Container(
+      width: R(56),
+      height: R(56),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(R(12)),
+        border: Border.all(color: const Color(0xFFE5E7EB), width: 1.2),
+      ),
       child: TextField(
         controller: c,
         textAlign: TextAlign.center,
         keyboardType: TextInputType.number,
         maxLength: 1,
-        decoration: InputDecoration(
+        decoration: const InputDecoration(
           counterText: "",
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          border: InputBorder.none,
         ),
       ),
     );
@@ -778,7 +871,7 @@ class OtpWidget extends StatelessWidget {
 }
 
 // =====================================================
-// Artisan Info like screenshot
+// Artisan Info
 // =====================================================
 
 class ArtisanInfoStep extends StatelessWidget {
@@ -812,6 +905,8 @@ class ArtisanInfoStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    double R(double v) => Responsive.s(v);
+
     return Column(
       children: [
         _pill(
@@ -819,74 +914,101 @@ class ArtisanInfoStep extends StatelessWidget {
           hint: "Service principal",
           icon: Icons.handyman_outlined,
           readOnly: false,
-          right: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.primary),
+          right: Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: AppColors.primary,
+            size: R(20),
+          ),
+          R: R,
         ),
-        const SizedBox(height: 14),
-
+        SizedBox(height: R(14)),
         _pill(
           controller: newServiceCtrl,
           hint: "Type de service",
           icon: Icons.grid_view_rounded,
           rightWidget: SizedBox(
-            height: 36,
+            height: R(36),
             child: ElevatedButton(
               onPressed: onAddTag,
               style: ElevatedButton.styleFrom(
                 elevation: 0,
                 backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-                padding: const EdgeInsets.symmetric(horizontal: 18),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(R(22)),
+                ),
+                padding: EdgeInsets.symmetric(horizontal: R(18)),
               ),
-              child: Text("Ajouter", style: GoogleFonts.poppins(fontWeight: FontWeight.w700, color: Colors.white, fontSize: 12)),
+              child: Text(
+                "Ajouter",
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  fontSize: R(12),
+                ),
+              ),
             ),
           ),
+          R: R,
         ),
-        const SizedBox(height: 10),
-
+        SizedBox(height: R(10)),
         if (tags.isNotEmpty)
           Align(
             alignment: Alignment.centerLeft,
             child: Wrap(
-              spacing: 10,
-              runSpacing: 8,
+              spacing: R(10),
+              runSpacing: R(8),
               children: tags.map((t) {
                 return InkWell(
                   onTap: () => onRemoveTag(t),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: R(12), vertical: R(6)),
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius: BorderRadius.circular(R(18)),
                       border: Border.all(color: AppColors.primary),
                       color: const Color(0xFFFFF1EB),
                     ),
                     child: Text(
                       t,
-                      style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.primary),
+                      style: GoogleFonts.poppins(
+                        fontSize: R(10),
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
                     ),
                   ),
                 );
               }).toList(),
             ),
           ),
-
-        if (tags.isNotEmpty) const SizedBox(height: 14),
-
-        _pill(controller: villeCtrl, hint: "Ville", icon: Icons.location_on_outlined),
-        const SizedBox(height: 14),
-
+        if (tags.isNotEmpty) SizedBox(height: R(14)),
+        _pill(
+          controller: villeCtrl,
+          hint: "Ville",
+          icon: Icons.location_on_outlined,
+          R: R,
+        ),
+        SizedBox(height: R(14)),
         _pill(
           controller: adresseCtrl,
           hint: "Adresse",
           icon: Icons.home_outlined,
           rightWidget: Container(
-            width: 64,
-            height: 36,
-            decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(22)),
-            child: const Icon(Icons.gps_fixed_rounded, color: Colors.white, size: 18),
+            width: R(64),
+            height: R(36),
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(R(22)),
+            ),
+            child: Icon(
+              Icons.gps_fixed_rounded,
+              color: Colors.white,
+              size: R(18),
+            ),
           ),
+          R: R,
         ),
-        const SizedBox(height: 14),
-
+        SizedBox(height: R(14)),
         _pill(
           controller: diplomeCtrl,
           hint: diplomeSelected ? "Diplôme sélectionné" : "Scannez le diplôme",
@@ -894,18 +1016,28 @@ class ArtisanInfoStep extends StatelessWidget {
           readOnly: true,
           onTap: onPickDiplome,
           rightWidget: SizedBox(
-            height: 36,
+            height: R(36),
             child: ElevatedButton(
               onPressed: onPickDiplome,
               style: ElevatedButton.styleFrom(
                 elevation: 0,
                 backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-                padding: const EdgeInsets.symmetric(horizontal: 18),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(R(22)),
+                ),
+                padding: EdgeInsets.symmetric(horizontal: R(18)),
               ),
-              child: Text("Scanner", style: GoogleFonts.poppins(fontWeight: FontWeight.w700, color: Colors.white, fontSize: 12)),
+              child: Text(
+                "Scanner",
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  fontSize: R(12),
+                ),
+              ),
             ),
           ),
+          R: R,
         ),
       ],
     );
@@ -915,6 +1047,7 @@ class ArtisanInfoStep extends StatelessWidget {
     required TextEditingController controller,
     required String hint,
     required IconData icon,
+    required double Function(double) R,
     bool readOnly = false,
     VoidCallback? onTap,
     Widget? right,
@@ -922,26 +1055,29 @@ class ArtisanInfoStep extends StatelessWidget {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(30),
+      borderRadius: BorderRadius.circular(R(30)),
       child: Container(
-        height: 52,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
+        height: R(48),
+        padding: EdgeInsets.symmetric(horizontal: R(14)),
         decoration: BoxDecoration(
           color: const Color(0xFFFFF1EB),
-          borderRadius: BorderRadius.circular(30),
+          borderRadius: BorderRadius.circular(R(30)),
           border: Border.all(color: AppColors.primary, width: 1.2),
         ),
         child: Row(
           children: [
-            Icon(icon, color: AppColors.primary, size: 18),
-            const SizedBox(width: 10),
+            Icon(icon, color: AppColors.primary, size: R(18)),
+            SizedBox(width: R(10)),
             Expanded(
               child: TextField(
                 controller: controller,
                 readOnly: readOnly,
                 decoration: InputDecoration(
                   hintText: hint,
-                  hintStyle: GoogleFonts.poppins(fontSize: 13, color: AppColors.textLight),
+                  hintStyle: GoogleFonts.poppins(
+                    fontSize: R(13),
+                    color: AppColors.textLight,
+                  ),
                   border: InputBorder.none,
                   isDense: true,
                 ),
@@ -957,7 +1093,7 @@ class ArtisanInfoStep extends StatelessWidget {
 }
 
 // =====================================================
-// Portfolio like screenshot
+// Portfolio
 // =====================================================
 
 class ArtisanPortfolioStep extends StatefulWidget {
@@ -989,51 +1125,65 @@ class _ArtisanPortfolioStepState extends State<ArtisanPortfolioStep> {
 
   @override
   Widget build(BuildContext context) {
+    double R(double v) => Responsive.s(v);
     final count = widget.descriptionCtrl.text.length.clamp(0, 250);
 
     return Column(
       children: [
-        Stack(
-          children: [
-            SizedBox(
-              height: 120,
-              child: TextField(
-                controller: widget.descriptionCtrl,
-                maxLines: null,
-                maxLength: 250,
-                decoration: InputDecoration(
-                  hintText: "Décrivez votre expérience...",
-                  counterText: "",
-                  filled: true,
-                  fillColor: const Color(0xFFFFF7F3),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: const BorderSide(color: AppColors.primary),
+        SizedBox(
+          height: R(130),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: TextField(
+                  controller: widget.descriptionCtrl,
+                  maxLines: null,
+                  expands: true,
+                  minLines: null,
+                  maxLength: 250,
+                  decoration: InputDecoration(
+                    hintText: "Décrivez votre expérience...",
+                    counterText: "",
+                    filled: true,
+                    fillColor: const Color(0xFFFFF7F3),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(R(20)),
+                      borderSide:
+                          const BorderSide(color: AppColors.primary),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(R(20)),
+                      borderSide: const BorderSide(
+                          color: AppColors.primary, width: 2),
+                    ),
+                    contentPadding: EdgeInsets.fromLTRB(
+                        R(16), R(14), R(16), R(34)),
                   ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: const BorderSide(color: AppColors.primary, width: 2),
-                  ),
-                  contentPadding: const EdgeInsets.fromLTRB(16, 14, 16, 22),
                 ),
               ),
-            ),
-            Positioned(
-              right: 10,
-              bottom: 6,
-              child: Text("$count/250 caractères", style: GoogleFonts.poppins(fontSize: 10, color: AppColors.textLight)),
-            ),
-          ],
+              Positioned(
+                right: R(10),
+                bottom: R(6),
+                child: Text(
+                  "$count/250 caractères",
+                  style: GoogleFonts.poppins(
+                    fontSize: R(10),
+                    color: AppColors.textLight,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: R(16)),
         InkWell(
           onTap: widget.onPickImages,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(R(20)),
           child: Container(
-            height: 170,
+            height: R(128),
             width: double.infinity,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(R(20)),
               border: Border.all(color: AppColors.primary),
               color: const Color(0xFFFFF7F3),
             ),
@@ -1041,44 +1191,62 @@ class _ArtisanPortfolioStepState extends State<ArtisanPortfolioStep> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  width: 74,
-                  height: 74,
-                  decoration: const BoxDecoration(color: Color(0xFFFFE6DC), shape: BoxShape.circle),
-                  child: const Icon(Icons.upload_rounded, color: AppColors.primary, size: 30),
+                  width: R(74),
+                  height: R(74),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFFE6DC),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.upload_rounded,
+                    color: AppColors.primary,
+                    size: R(30),
+                  ),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: R(12)),
                 Text(
                   "Cliquez pour télécharger vos images",
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textDark),
+                  style: GoogleFonts.poppins(
+                    fontSize: R(12),
+                    color: AppColors.textDark,
+                  ),
                 ),
                 if (widget.imagesCount > 0) ...[
-                  const SizedBox(height: 6),
-                  Text("Images sélectionnées: ${widget.imagesCount}",
-                      style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textLight)),
+                  SizedBox(height: R(6)),
+                  Text(
+                    "Images sélectionnées: ${widget.imagesCount}",
+                    style: GoogleFonts.poppins(
+                      fontSize: R(11),
+                      color: AppColors.textLight,
+                    ),
+                  ),
                 ],
               ],
             ),
           ),
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: R(14)),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
-              width: 22,
-              height: 22,
+              width: R(22),
+              height: R(22),
               child: Checkbox(
                 value: accepted,
                 activeColor: AppColors.primary,
                 onChanged: (v) => setState(() => accepted = v ?? false),
               ),
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: R(10)),
             Expanded(
               child: Text(
                 "J'accepte les conditions générales d'utilisation et la politique de confidentialité",
-                style: GoogleFonts.poppins(fontSize: 10.5, color: AppColors.textLight),
+                style: GoogleFonts.poppins(
+                  fontSize: R(10.5),
+                  color: AppColors.textLight,
+                ),
               ),
             ),
           ],
@@ -1087,6 +1255,10 @@ class _ArtisanPortfolioStepState extends State<ArtisanPortfolioStep> {
     );
   }
 }
+
+// =====================================================
+// PASSWORD
+// =====================================================
 
 class SecurePasswordWidget extends StatefulWidget {
   final TextEditingController pass1;
@@ -1104,30 +1276,65 @@ class _SecurePasswordWidgetState extends State<SecurePasswordWidget> {
 
   @override
   Widget build(BuildContext context) {
+    double R(double v) => Responsive.s(v);
+
     return Column(
       children: [
-        _field("Créer un mot de passe", widget.pass1, show1, () => setState(() => show1 = !show1)),
-        const SizedBox(height: 14),
-        _field("Confirmer le mot de passe", widget.pass2, show2, () => setState(() => show2 = !show2)),
+        _field(
+          "Créer un mot de passe",
+          widget.pass1,
+          show1,
+          () => setState(() => show1 = !show1),
+          R,
+        ),
+        SizedBox(height: R(14)),
+        _field(
+          "Confirmer le mot de passe",
+          widget.pass2,
+          show2,
+          () => setState(() => show2 = !show2),
+          R,
+        ),
       ],
     );
   }
 
-  Widget _field(String hint, TextEditingController c, bool show, VoidCallback toggle) {
-    return TextField(
-      controller: c,
-      obscureText: !show,
-      decoration: InputDecoration(
-        hintText: hint,
-        prefixIcon: const Icon(Icons.lock_outline, color: AppColors.primary),
-        suffixIcon: IconButton(onPressed: toggle, icon: Icon(show ? Icons.visibility : Icons.visibility_off)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(30),
-          borderSide: const BorderSide(color: AppColors.primary),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(30),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+  Widget _field(
+    String hint,
+    TextEditingController c,
+    bool show,
+    VoidCallback toggle,
+    double Function(double) R,
+  ) {
+    return SizedBox(
+      height: R(48),
+      child: TextField(
+        controller: c,
+        obscureText: !show,
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(fontSize: R(13)),
+          prefixIcon: Icon(
+            Icons.lock_outline,
+            color: AppColors.primary,
+            size: R(18),
+          ),
+          suffixIcon: IconButton(
+            onPressed: toggle,
+            icon: Icon(
+              show ? Icons.visibility : Icons.visibility_off,
+              size: R(18),
+            ),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(R(30)),
+            borderSide: const BorderSide(color: AppColors.primary),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(R(30)),
+            borderSide:
+                const BorderSide(color: AppColors.primary, width: 2),
+          ),
         ),
       ),
     );
