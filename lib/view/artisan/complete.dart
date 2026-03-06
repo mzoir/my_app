@@ -341,7 +341,7 @@ class _AuthFlowPageState extends State<AuthFlowPage> {
     return 0.0;
   }
 
-  Widget _content(double R(double v), double sidePadding) {
+  Widget _content(double Function(double v) R, double sidePadding) {
     final vm = context.watch<ArtisanViewModel>();
     final pickedDiplome = kIsWeb ? diplomeFileWeb != null : diplomeFile != null;
     final imgCount = kIsWeb ? webImages.length : images.length;
@@ -439,7 +439,7 @@ class _AuthFlowPageState extends State<AuthFlowPage> {
   }
 
   Widget _bottomButtons(
-      ArtisanViewModel vm, double R(double v), double btnW) {
+      ArtisanViewModel vm, double Function(double v) R, double btnW) {
     // Verify + OTP + Password → single centered button
     if (step == AuthStep.verify ||
         step == AuthStep.otpEmail ||
@@ -553,7 +553,6 @@ class _AuthFlowPageState extends State<AuthFlowPage> {
     final double btnW = screenWidth * 0.7;
     final double twoBtnW = screenWidth - (sidePadding * 2);
 
-    Responsive.init(BoxConstraints(maxWidth: screenWidth, maxHeight: screenHeight));
     double R(double v) => Responsive.s(v);
 
     final bool hasTwoButtons =
@@ -1083,7 +1082,7 @@ class ArtisanInfoStep extends StatelessWidget {
                 ),
               ),
             ),
-            if (rightWidget != null) rightWidget,
+            ?rightWidget,
             if (rightWidget == null && right != null) right,
           ],
         ),

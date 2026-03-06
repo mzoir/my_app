@@ -197,10 +197,6 @@ class _AuthFlowPageState extends State<AuthFlowPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     double sidePadding = screenWidth < 400 ? 16 : 32;
 
-    Responsive.init(BoxConstraints(
-      maxWidth: screenWidth,
-      maxHeight: screenHeight,
-    ));
     double R(double v) => Responsive.s(v);
 
     final contentW = screenWidth * 1;

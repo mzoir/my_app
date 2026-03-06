@@ -79,10 +79,7 @@ class _ArtisanRegisterState extends State<ArtisanRegister> {
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
 
-    Responsive.init(BoxConstraints(
-      maxWidth: screenWidth,
-      maxHeight: screenHeight,
-    ));
+
     double R(double v) => Responsive.s(v);
 
     final fieldW = screenWidth * 0.85;

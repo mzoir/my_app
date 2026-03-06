@@ -4,6 +4,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 class GoogleLoginDemo extends StatefulWidget {
+  const GoogleLoginDemo({super.key});
+
   @override
   _GoogleLoginDemoState createState() => _GoogleLoginDemoState();
 }
@@ -14,10 +16,9 @@ class _GoogleLoginDemoState extends State<GoogleLoginDemo> {
 
   Future<void> _handleSignIn() async {
     try {
-      final GoogleSignInAccount? account = await _googleSignIn.authenticate();
-      if (account == null) return; // user canceled
+      final GoogleSignInAccount account = await _googleSignIn.authenticate(); // user canceled
 
-      final GoogleSignInAuthentication auth = await account.authentication;
+      final GoogleSignInAuthentication auth = account.authentication;
 
       // Send token to Laravel backend
       final response = await http.post(
@@ -43,8 +44,8 @@ class _GoogleLoginDemoState extends State<GoogleLoginDemo> {
     return Scaffold(
       body: Center(
         child: ElevatedButton(
-          child: Text("Login with Google"),
           onPressed: _handleSignIn,
+          child: Text("Login with Google"),
         ),
       ),
     );

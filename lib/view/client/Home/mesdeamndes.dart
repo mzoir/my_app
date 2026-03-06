@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:my_app/models/service_request.dart';
-
-import 'package:my_app/viewmodels/UserViewModel.dart';
-
+import 'package:my_app/viewmodels/client_view_model.dart';
+import "navbottom.dart";
 
 class MesDemandesScreen extends StatefulWidget {
   const MesDemandesScreen({super.key});
@@ -12,18 +11,25 @@ class MesDemandesScreen extends StatefulWidget {
   State<MesDemandesScreen> createState() => _MesDemandesScreenState();
 }
 
-class _MesDemandesScreenState extends State<MesDemandesScreen> {
+// ✅ ADDED AutomaticKeepAliveClientMixin
+class _MesDemandesScreenState extends State<MesDemandesScreen>
+    with AutomaticKeepAliveClientMixin {
+  // ✅ ADDED
+  @override
+  bool get wantKeepAlive => true;
+
   @override
   void initState() {
     super.initState();
-    // Fetch requests when screen loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AuthProvider>().fetchRequests();
+      context.read<ClientViewModel>().fetchRequests();
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // ✅ ADDED (IMPORTANT)
+
     return Scaffold(
       backgroundColor: const Color(0xFFF4F4F4),
       appBar: const AtlasAppBar(),
@@ -31,7 +37,6 @@ class _MesDemandesScreenState extends State<MesDemandesScreen> {
     );
   }
 }
-
 // ─── CUSTOM APP BAR ──────────────────────────────────────────────────────────
 
 class AtlasAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -74,7 +79,9 @@ class AtlasAppBar extends StatelessWidget implements PreferredSizeWidget {
                       const SizedBox(width: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(8),
@@ -92,9 +99,25 @@ class AtlasAppBar extends StatelessWidget implements PreferredSizeWidget {
                   ),
                   Row(
                     children: [
-                      _AppBarIconBtn(icon: Icons.calendar_today_outlined),
-                      const SizedBox(width: 10),
-                      _AppBarIconBtn(icon: Icons.notifications_outlined),
+                      _AppBarIconBtn(
+                        icon: Icons.calendar_today_outlined,
+                        onTap: () {
+                          final shell = context
+                              .findAncestorStateOfType<HomeShellCState>();
+                          shell?.setIndex(6); // → AgendaPage
+                        },
+                      ),
+
+                      SizedBox(width: 10),
+
+                      _AppBarIconBtn(
+                        icon: Icons.notifications_outlined,
+                        onTap: () {
+                          final shell = context
+                              .findAncestorStateOfType<HomeShellCState>();
+                          shell?.openNotifications();
+                        },
+                      ),
                     ],
                   ),
                 ],
@@ -109,12 +132,19 @@ class AtlasAppBar extends StatelessWidget implements PreferredSizeWidget {
                 child: Row(
                   children: [
                     const SizedBox(width: 14),
-                    const Icon(Icons.search, color: Color(0xFFBBBBBB), size: 20),
+                    const Icon(
+                      Icons.search,
+                      color: Color(0xFFBBBBBB),
+                      size: 20,
+                    ),
                     const SizedBox(width: 8),
                     const Expanded(
                       child: Text(
                         'Quelle service recherchez-vous ?',
-                        style: TextStyle(fontSize: 14, color: Color(0xFFBBBBBB)),
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFFBBBBBB),
+                        ),
                       ),
                     ),
                     Container(
@@ -125,7 +155,11 @@ class AtlasAppBar extends StatelessWidget implements PreferredSizeWidget {
                         color: const Color(0xFF1A1A1A),
                         borderRadius: BorderRadius.circular(50),
                       ),
-                      child: const Icon(Icons.tune, color: Colors.white, size: 16),
+                      child: const Icon(
+                        Icons.tune,
+                        color: Colors.white,
+                        size: 16,
+                      ),
                     ),
                   ],
                 ),
@@ -140,7 +174,9 @@ class AtlasAppBar extends StatelessWidget implements PreferredSizeWidget {
 
 class _AppBarIconBtn extends StatelessWidget {
   final IconData icon;
-  const _AppBarIconBtn({required this.icon});
+  final VoidCallback onTap;
+
+  const _AppBarIconBtn({required this.icon, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -151,7 +187,12 @@ class _AppBarIconBtn extends StatelessWidget {
         color: Colors.white.withOpacity(0.2),
         shape: BoxShape.circle,
       ),
-      child: Icon(icon, color: Colors.white, size: 20),
+      child: IconButton(
+        iconSize: 15.0,
+        icon: Icon(icon),
+        color: Colors.white,
+        onPressed: onTap,
+      ),
     );
   }
 }
@@ -165,14 +206,20 @@ class MesDemandesBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final hPad = screenWidth > 600 ? 32.0 : 16.0;
-    final auth = context.watch<AuthProvider>();
+    final vm = context.watch<ClientViewModel>();
 
     return RefreshIndicator(
       color: const Color(0xFFF5601A),
-      onRefresh: () => auth.fetchRequests(),
+      onRefresh: () => vm.fetchRequests(),
       child: SingleChildScrollView(
+        key: const PageStorageKey('mes_demandes_scroll'),
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.fromLTRB(hPad, 28, hPad, MediaQuery.of(context).padding.bottom + 24),
+        padding: EdgeInsets.fromLTRB(
+          hPad,
+          28,
+          hPad,
+          MediaQuery.of(context).padding.bottom + 24,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -184,67 +231,69 @@ class MesDemandesBody extends StatelessWidget {
                   'Mes demandes',
                   style: TextStyle(
                     fontSize: 22,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.bold,
                     color: Color(0xFF1A1A1A),
                   ),
                 ),
                 Container(
-                  width: 38,
-                  height: 38,
+                  width: 24,
+                  height: 24,
                   decoration: BoxDecoration(
                     color: const Color(0xFFFFEDE3),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(
-                    Icons.layers_outlined,
-                    color: Color(0xFFF5601A),
-                    size: 20,
-                  ),
+                  child: Image.asset("images/tt.png"),
                 ),
               ],
             ),
             const SizedBox(height: 6),
-            Text(
-              '${auth.requests.length} demande${auth.requests.length != 1 ? 's' : ''} en cours',
-              style: const TextStyle(
+            const Text(
+              'Gorem ipsum dolor sit amet, consectetur adipiscing elit.',
+              style: TextStyle(
                 fontSize: 13,
-                color: Color(0xFF999999),
+                color: Color.fromRGBO(73, 73, 73, 1),
                 height: 1.5,
               ),
             ),
             const SizedBox(height: 20),
 
             // ── Loading state ──
-            if (auth.loading && auth.requests.isEmpty)
+            if (vm.loading && vm.requests.isEmpty)
               const Center(
                 child: Padding(
                   padding: EdgeInsets.symmetric(vertical: 60),
                   child: CircularProgressIndicator(color: Color(0xFFF5601A)),
                 ),
               )
-
             // ── Error state ──
-            else if (auth.error != null && auth.requests.isEmpty)
+            else if (vm.error != null && vm.requests.isEmpty)
               Center(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 60),
                   child: Column(
                     children: [
-                      const Icon(Icons.error_outline,
-                          color: Color(0xFFCCCCCC), size: 48),
+                      const Icon(
+                        Icons.error_outline,
+                        color: Color(0xFFCCCCCC),
+                        size: 48,
+                      ),
                       const SizedBox(height: 12),
                       Text(
-                        auth.error!,
+                        vm.error!,
                         textAlign: TextAlign.center,
                         style: const TextStyle(
-                            fontSize: 14, color: Color(0xFF999999)),
+                          fontSize: 14,
+                          color: Color(0xFF999999),
+                        ),
                       ),
                       const SizedBox(height: 16),
                       GestureDetector(
-                        onTap: () => auth.fetchRequests(),
+                        onTap: () => vm.fetchRequests(),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 24, vertical: 12),
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFF5601A),
                             borderRadius: BorderRadius.circular(50),
@@ -252,8 +301,9 @@ class MesDemandesBody extends StatelessWidget {
                           child: const Text(
                             'Réessayer',
                             style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600),
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ),
@@ -261,36 +311,41 @@ class MesDemandesBody extends StatelessWidget {
                   ),
                 ),
               )
-
             // ── Empty state ──
-            else if (auth.requests.isEmpty)
+            else if (vm.requests.isEmpty)
               const Center(
                 child: Padding(
                   padding: EdgeInsets.symmetric(vertical: 60),
                   child: Column(
                     children: [
-                      Icon(Icons.inbox_outlined,
-                          color: Color(0xFFCCCCCC), size: 48),
+                      Icon(
+                        Icons.inbox_outlined,
+                        color: Color(0xFFCCCCCC),
+                        size: 48,
+                      ),
                       SizedBox(height: 12),
                       Text(
                         'Aucune demande pour l\'instant.',
                         style: TextStyle(
-                            fontSize: 14, color: Color(0xFF999999)),
+                          fontSize: 14,
+                          color: Color(0xFF999999),
+                        ),
                       ),
                     ],
                   ),
                 ),
               )
-
             // ── Cards ──
             else
-              ...auth.requests.map((request) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _DemandeCard(request: request),
-                  )),
-                    SizedBox(height: 30,),
+              ...vm.requests.map(
+                (request) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _DemandeCard(request: request),
+                ),
+              ),
+
+            const SizedBox(height: 30),
           ],
-          
         ),
       ),
     );
@@ -303,7 +358,6 @@ class _DemandeCard extends StatelessWidget {
   final ServiceRequest request;
   const _DemandeCard({required this.request});
 
-  // Map service name to an icon + color
   static const Map<String, IconData> _icons = {
     'Plomberie': Icons.water_drop_outlined,
     'Électricité': Icons.bolt,
@@ -342,41 +396,18 @@ class _DemandeCard extends StatelessWidget {
     'Support Technique': Color(0xFF6D4C41),
   };
 
-  Color get _iconBg =>
-      _colors[request.serviceName] ?? const Color(0xFFF5601A);
-
-  IconData get _icon =>
-      _icons[request.serviceName] ?? Icons.build_outlined;
-
-  Color get _statusColor {
-    switch (request.status) {
-      case 'active':
-        return const Color(0xFF4CAF50);
-      case 'completed':
-        return const Color(0xFF2196F3);
-      default:
-        return const Color(0xFFFF9800); // pending
-    }
-  }
-
-  String get _statusLabel {
-    switch (request.status) {
-      case 'active':
-        return 'Actif';
-      case 'completed':
-        return 'Terminé';
-      default:
-        return 'En attente';
-    }
-  }
+  Color get _iconBg => _colors[request.serviceName] ?? const Color(0xFFF5601A);
+  IconData get _icon => _icons[request.serviceName] ?? Icons.build_outlined;
 
   Future<void> _confirmDelete(BuildContext context) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text('Supprimer la demande',
-            style: TextStyle(fontWeight: FontWeight.w700)),
+        title: const Text(
+          'Supprimer la demande',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
         content: Text(
           'Voulez-vous vraiment supprimer "${request.serviceName ?? 'cette demande'}" ?',
           style: const TextStyle(color: Color(0xFF666666)),
@@ -384,30 +415,37 @@ class _DemandeCard extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Annuler',
-                style: TextStyle(color: Color(0xFF999999))),
+            child: const Text(
+              'Annuler',
+              style: TextStyle(color: Color(0xFF999999)),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Supprimer',
-                style: TextStyle(
-                    color: Color(0xFFF5601A), fontWeight: FontWeight.w700)),
+            child: const Text(
+              'Supprimer',
+              style: TextStyle(
+                color: Color(0xFFF5601A),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ],
       ),
     );
 
     if (confirmed == true && context.mounted) {
-      final auth = context.read<AuthProvider>();
-      final success = await auth.deleteRequest(request.id);
+      final vm = context.read<ClientViewModel>();
+      final success = await vm.deleteRequest(request.id);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(success
-                ? 'Demande supprimée.'
-                : auth.error ?? 'Erreur lors de la suppression.'),
-            backgroundColor:
-                success ? const Color(0xFFF5601A) : Colors.red,
+            content: Text(
+              success
+                  ? 'Demande supprimée.'
+                  : vm.error ?? 'Erreur lors de la suppression.',
+            ),
+            backgroundColor: success ? const Color(0xFFF5601A) : Colors.red,
           ),
         );
       }
@@ -417,6 +455,7 @@ class _DemandeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      height: 87,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -429,99 +468,110 @@ class _DemandeCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
-        children: [
-          // Category icon
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: _iconBg,
-              borderRadius: BorderRadius.circular(14),
+      child: Center(
+        child: Row(
+          children: [
+            // Category icon
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: _iconBg,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(_icon, color: Colors.white, size: 26),
             ),
-            child: Icon(_icon, color: Colors.white, size: 26),
-          ),
-          const SizedBox(width: 14),
+            const SizedBox(width: 14),
 
-          // Title + status + type
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  request.serviceName ?? 'Service',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1A1A1A),
-                  ),
-                ),
-                if (request.serviceType != null &&
-                    request.serviceType!.isNotEmpty) ...[
-                  const SizedBox(height: 2),
+            // Title + responses + avatars
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
                   Text(
-                    request.serviceType!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    '${request.responsesCount} réponse${request.responsesCount != 1 ? 's' : ''}',
                     style: const TextStyle(
-                        fontSize: 12, color: Color(0xFF999999)),
-                  ),
-                ],
-                const SizedBox(height: 6),
-                // Status badge
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: _statusColor.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(50),
-                  ),
-                  child: Text(
-                    _statusLabel,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: _statusColor,
+                      fontSize: 12,
+                      color: Color(0xFF999999),
                     ),
                   ),
+                  const SizedBox(height: 3),
+                  if (request.responsesCount > 0)
+                    buildStackedAvatars(
+                      List.generate(
+                        request.responsesCount.clamp(0, 3),
+                        (i) => 'https://i.pravatar.cc/100?img=${i + 1}',
+                      ),
+                    ),
+                  Row(
+                    children: [
+                      Text(
+                        request.serviceName ?? 'Service',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Color.fromRGBO(49, 65, 88, 1),
+                        ),
+                      ),
+                      const SizedBox(width: 50),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(width: 10),
+
+            // Delete button
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                const SizedBox(height: 15),
+                GestureDetector(
+                  onTap: () => _confirmDelete(context),
+                  child: Container(
+                    width: 35,
+                    height: 35,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color.fromARGB(231, 229, 206, 162),
+                    ),
+                    child: Image.asset("images/Vector.png"),
+                  ),
                 ),
+                const SizedBox(height: 9),
               ],
             ),
-          ),
-
-          const SizedBox(width: 10),
-
-          // Responses count + delete
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '${request.responsesCount} réponse${request.responsesCount != 1 ? 's' : ''}',
-                style: const TextStyle(
-                    fontSize: 12, color: Color(0xFF999999)),
-              ),
-              const SizedBox(height: 8),
-              GestureDetector(
-                onTap: () => _confirmDelete(context),
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFEDE3),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.delete_outline,
-                    color: Color(0xFFF5601A),
-                    size: 18,
-                  ),
-                ),
-              ),
-                SizedBox(height: 30,),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
+}
+
+Widget buildStackedAvatars(List<String> imageUrls) {
+  const double avatarSize = 32.0;
+  const double overlap = 10.0;
+
+  return SizedBox(
+    width: avatarSize + (imageUrls.length - 1) * (avatarSize - overlap),
+    height: avatarSize,
+    child: Stack(
+      children: List.generate(imageUrls.length, (index) {
+        return Positioned(
+          left: index * (avatarSize - overlap),
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2),
+            ),
+            child: CircleAvatar(
+              radius: avatarSize / 2,
+              backgroundImage: NetworkImage(imageUrls[index]),
+            ),
+          ),
+        );
+      }),
+    ),
+  );
 }

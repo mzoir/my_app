@@ -9,6 +9,7 @@ class ServiceRequest {
   final String? additionalInfo;
   final String status;
   final int responsesCount;
+  final String? clientName; // ✅ from user.name via Laravel eager load
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -23,6 +24,7 @@ class ServiceRequest {
     this.additionalInfo,
     this.status = 'pending',
     this.responsesCount = 0,
+    this.clientName,
     this.createdAt,
     this.updatedAt,
   });
@@ -30,7 +32,7 @@ class ServiceRequest {
   factory ServiceRequest.fromJson(Map<String, dynamic> json) {
     return ServiceRequest(
       id: json['id'] as int,
-      userId: json['user_id'] as int,
+      userId: json['user_id'] as int? ?? 0,
       serviceName: json['service_name']?.toString(),
       serviceType: json['service_type']?.toString(),
       description: json['description']?.toString(),
@@ -39,6 +41,9 @@ class ServiceRequest {
       additionalInfo: json['additional_info']?.toString(),
       status: json['status']?.toString() ?? 'pending',
       responsesCount: json['responses_count'] as int? ?? 0,
+      // ✅ get client name from nested user object
+      clientName: json['user']?['name']?.toString() ??
+          json['client_name']?.toString(),
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
           : null,
@@ -65,40 +70,7 @@ class ServiceRequest {
     };
   }
 
-  ServiceRequest copyWith({
-    int? id,
-    int? userId,
-    String? serviceName,
-    String? serviceType,
-    String? description,
-    String? ville,
-    String? address,
-    String? additionalInfo,
-    String? status,
-    int? responsesCount,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  }) {
-    return ServiceRequest(
-      id: id ?? this.id,
-      userId: userId ?? this.userId,
-      serviceName: serviceName ?? this.serviceName,
-      serviceType: serviceType ?? this.serviceType,
-      description: description ?? this.description,
-      ville: ville ?? this.ville,
-      address: address ?? this.address,
-      additionalInfo: additionalInfo ?? this.additionalInfo,
-      status: status ?? this.status,
-      responsesCount: responsesCount ?? this.responsesCount,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-    );
-  }
-
   bool get isPending => status == 'pending';
   bool get isActive => status == 'active';
   bool get isCompleted => status == 'completed';
-
-  @override
-  String toString() => 'ServiceRequest(id: $id, serviceName: $serviceName, status: $status)';
 }

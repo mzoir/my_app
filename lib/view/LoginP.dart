@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:my_app/view/core/app_colors.dart';
-import 'package:my_app/viewmodels/UserViewModel.dart';
+import 'package:my_app/viewmodels/client_view_model.dart';
 import 'package:provider/provider.dart';
 import 'package:my_app/utils/responsive.dart';
 
@@ -26,23 +26,32 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  Future<void> login(String email, String password) async {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    final ok = await auth.login(email, password);
+Future<void> login(String email, String password) async {
+  final auth = Provider.of<ClientViewModel>(context, listen: false);
 
-    if (!mounted) return;
+  final role = await auth.login(email, password); // ✅ now returns role
 
-    if (ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Login réussi")),
-      );
-      Navigator.pushReplacementNamed(context, '/home/client');
+  if (!mounted) return;
+
+  if (role != null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Login réussi")),
+    );
+
+    // ✅ redirect based on role
+    if (role == 'artisan') {
+      Navigator.pushReplacementNamed(context, '/home/artisan');
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(auth.error ?? "Login failed")),
-      );
+      Navigator.pushReplacementNamed(context, '/home/client');
     }
+
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(auth.error ?? "Login failed")),
+    );
   }
+  
+}
 
   InputDecoration _figmaDec(String hint, {Widget? suffixIcon}) {
     const borderColor = Color(0xFFFC5A15);
@@ -139,8 +148,6 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, c) {
-      Responsive.init(c);
       double R(double v) => Responsive.s(v);
 
       return Scaffold(
@@ -251,7 +258,7 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             SizedBox(height: R(30)),
                             SizedBox(
-                              width: double.infinity,
+                              width: R(300),
                               height: R(44),
                               child: ElevatedButton(
                                 onPressed: () async {
@@ -280,6 +287,29 @@ class _LoginPageState extends State<LoginPage> {
                       SizedBox(height: R(30)),
 
                       // SOCIAL BUTTONS (responsive full width)
+                  
+// WHITE CONTAINER wrapping social buttons + sign-up row
+Container(
+  width: double.infinity,
+  padding: EdgeInsets.symmetric(
+    horizontal: R(20),
+    vertical: R(28),
+  ),
+  decoration: BoxDecoration(
+    color: Colors.white,
+    borderRadius: BorderRadius.only(
+      topLeft: Radius.circular(R(30)),
+      topRight: Radius.circular(R(30)),
+    ),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withOpacity(0.06),
+        blurRadius: R(20),
+        offset: Offset(0, R(-4)),
+      ),
+    ],
+  ),
+  child: 
                       Column(
                         children: [
                           _socialButton(
@@ -312,9 +342,8 @@ class _LoginPageState extends State<LoginPage> {
                             textColor: Colors.black,
                             shadow: true,
                           ),
-                        ],
-                      ),
-                      SizedBox(height: R(30)),
+                     
+                      SizedBox(height: R(60)),
 
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -346,7 +375,8 @@ class _LoginPageState extends State<LoginPage> {
                         width: R(134),
                         height: R(5),
                       ),
-        
+           ],
+                      ),),
                     ],
                   ),
                 ),
@@ -357,6 +387,6 @@ class _LoginPageState extends State<LoginPage> {
           ],
         ),
         );
-      });
+      
   }
 }

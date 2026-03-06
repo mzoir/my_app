@@ -4,6 +4,8 @@ class User {
   final String email;
   final String? phone;
   final String? dateOfBirth;
+  final String? ville;
+  final String? role; // ✅ ADD THIS
 
   User({
     required this.id,
@@ -11,6 +13,8 @@ class User {
     required this.email,
     this.phone,
     this.dateOfBirth,
+    this.ville,
+    this.role,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -20,6 +24,8 @@ class User {
       email: (json['email'] ?? '').toString(),
       phone: json['phone']?.toString(),
       dateOfBirth: json['dateOfBirth']?.toString(),
+      ville: json['ville']?.toString(),
+      role: json['role']?.toString()
     );
   }
 
@@ -30,6 +36,7 @@ class User {
       'email': email,
       'phone': phone,
       'dateOfBirth': dateOfBirth,
+      'ville': ville,
     };
   }
 }

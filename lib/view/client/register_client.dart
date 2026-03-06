@@ -115,10 +115,6 @@ class _RegisterPageState extends State<RegisterPage> {
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
 
-    Responsive.init(BoxConstraints(
-      maxWidth: screenWidth,
-      maxHeight: screenHeight,
-    ));
     double R(double v) => Responsive.s(v);
 
     final fieldW = screenWidth * 0.85;
@@ -210,7 +206,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   ),
 
-                  Spacer(flex: 1),
+                  Spacer(flex: 4),
 
                   // Footer
                   Row(
@@ -238,16 +234,14 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                     ],
                   ),
-
-                  Spacer(flex: 1),
-
-                  // Home Indicator
-                  SvgPicture.asset(
-                    'images/HomeIndicator.svg',
-                    width: R(134),
-                    height: R(5),
-                    fit: BoxFit.contain,
-                  ),
+                   SizedBox(height: R(20)),
+                      SvgPicture.asset(
+                        'images/HomeIndicator.svg',
+                        width: R(134),
+                        height: R(5),
+                      ),
+                       SizedBox(height: R(2)),
+        
 
                   Spacer(flex: 1),
                 ],

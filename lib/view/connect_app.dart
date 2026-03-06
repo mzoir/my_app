@@ -136,10 +136,7 @@ class _ChooseProfilePageState extends State<ChooseProfilePage> {
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
 
-    Responsive.init(BoxConstraints(
-      maxWidth: screenWidth,
-      maxHeight: screenHeight,
-    ));
+   
     double R(double v) => Responsive.s(v);
 
     final cardW = screenWidth * 0.9;
@@ -265,7 +262,14 @@ class _ChooseProfilePageState extends State<ChooseProfilePage> {
                     ],
                   ),
 
-                  Spacer(flex: 1),
+                     SizedBox(height: R(20)),
+                      SvgPicture.asset(
+                        'images/HomeIndicator.svg',
+                        width: R(134),
+                        height: R(5),
+                      ),
+                       SizedBox(height: R(2)),
+        
                 ],
               ),
             ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:my_app/view/core/app_colors.dart';
+import 'Home/navbottom.dart';
 
 class SubscriptionPlans extends StatefulWidget {
   const SubscriptionPlans({super.key});
@@ -327,7 +328,18 @@ class PlanCard extends StatelessWidget {
               height: 46,
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.pushNamed(context, '/home/client');
+               
+  Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => HomeShellC()),
+    );
+  
+
+
+
+
+
+
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: mainColor,

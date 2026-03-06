@@ -38,7 +38,6 @@ class _SubscriptionPlansState extends State<SubscriptionPlans> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, c) {
-        Responsive.init(c);
         double R(double v) => Responsive.s(v);
 
         // center helper

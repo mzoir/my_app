@@ -1,11 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:my_app/view/core/app_colors.dart';
-import 'package:provider/provider.dart';
-import 'planc.dart';
-import 'package:my_app/viewmodels/client_view_model.dart';
-import 'package:my_app/utils/responsive.dart';
 
 
 class MesDemandesScreen extends StatelessWidget {

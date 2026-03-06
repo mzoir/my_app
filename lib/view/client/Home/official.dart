@@ -2,64 +2,16 @@
 // keep same widget names + no new arguments ✅
 
 import 'package:my_app/viewmodels/client_view_model.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:my_app/models/artisan_model.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'mesdeamndes.dart';
-import 'demande.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:my_app/view/core/app_colors.dart';
-import 'package:my_app/view/LoginP.dart';
 import 'package:my_app/utils/responsive.dart';
-import 'profileScreen.dart';
-// ✅ same Responsive.s() system
+import "artisanScreen.dart";
+import 'navbottom.dart';
 
-class HomeShell extends StatefulWidget {
-  const HomeShell({super.key});
-
-  @override
-  State<HomeShell> createState() => _HomeShellState();
-}
-
-class _HomeShellState extends State<HomeShell> {
-  int index = 0;
-
-  final pages = const [
-    HomePage(),
-    MesDemandesScreen(),
-    NewDemandeFlow(),
-    _StubPage(title: "Messages"),
-    ProfileScreen(),
-  ];
-
-  void _setIndex(int i) => setState(() => index = i);
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, c) {
-        Responsive.init(c);
-        double R(double v) => Responsive.s(v);
-
-        return Scaffold(
-          backgroundColor: const Color(0xFFF7F7F7),
-          body: Stack(
-            children: [
-              IndexedStack(index: index, children: pages),
-
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: R(14),
-                child: _BottomNav(current: index, onTap: (i) => _setIndex(i)),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
+// ====================== HOME PAGE ======================
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -71,8 +23,16 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final serviceCtrl = TextEditingController();
   final cityCtrl = TextEditingController();
+  int faqOpen = 1;
 
-  int faqOpen = 1; // second one opened like screenshot
+  @override
+  void initState() {
+    super.initState();
+    // Fetch artisans from DB on load
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ClientViewModel>().fetchArtisans();
+    });
+  }
 
   @override
   void dispose() {
@@ -85,6 +45,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     double R(double v) => Responsive.s(v);
     final w = MediaQuery.sizeOf(context).width;
+    final vm = context.watch<ClientViewModel>(); // ✅ watch for artisan updates
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F7F7),
@@ -133,17 +94,24 @@ class _HomePageState extends State<HomePage> {
                         const Spacer(),
                         _CircleIcon(
                           icon: Icons.calendar_today_outlined,
-                          onTap: () {},
+                          onTap: () {
+ final shell = context.findAncestorStateOfType<HomeShellCState>();
+    shell?.setIndex(6); // → AgendaPage
+
+                          },
                         ),
                         SizedBox(width: R(10)),
                         _CircleIcon(
                           icon: Icons.notifications_none_rounded,
-                          onTap: () {},
+                          onTap: () {
+                            final shell = context
+                                .findAncestorStateOfType<HomeShellCState>();
+                            shell?.openNotifications();
+                          },
                         ),
                       ],
                     ),
                     SizedBox(height: R(16)),
-
                     Row(
                       children: [
                         Expanded(
@@ -232,7 +200,6 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               SizedBox(height: R(14)),
-
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: R(8)),
                 child: Row(
@@ -275,7 +242,7 @@ class _HomePageState extends State<HomePage> {
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    "Annonce d’Aujourd’hui",
+                    "Annonce d'Aujourd'hui",
                     style: GoogleFonts.poppins(
                       fontSize: R(18),
                       fontWeight: FontWeight.w800,
@@ -285,14 +252,14 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               SizedBox(height: R(12)),
-
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: R(18)),
                 child: _PromoCard(width: w),
               ),
 
               SizedBox(height: R(24)),
-              // =================== SECTION: TOP ARTISANS ===================
+
+              // =================== SECTION: TOP ARTISANS (DYNAMIC) ✅ ===================
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: R(18)),
                 child: Row(
@@ -334,27 +301,34 @@ class _HomePageState extends State<HomePage> {
 
               SizedBox(
                 height: R(350),
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.symmetric(horizontal: R(18)),
-                  children: const [
-                    _ArtisanCard(
-                      imageAsset: "images/artisan1.jpg",
-                      name: "Ahmed Bennani",
-                      job: "Plomberie & Sanitaire",
-                      city: "Casablanca",
-                      rating: "4.9/5 (127 reviews)",
-                    ),
-                    SizedBox(width: 14),
-                    _ArtisanCard(
-                      imageAsset: "images/artisan2.jpg",
-                      name: "Omar Berrada",
-                      job: "Dépannage Urgence",
-                      city: "Marrakech",
-                      rating: "4.9/5 (127 reviews)",
-                    ),
-                  ],
-                ),
+                child: vm.loadingArtisans
+                    // Loading state
+                    ? Center(
+                        child: CircularProgressIndicator(
+                          color: const Color(0xFFFC5A15),
+                          strokeWidth: R(2.5),
+                        ),
+                      )
+                    // Empty state
+                    : vm.artisans.isEmpty
+                    ? Center(
+                        child: Text(
+                          "Aucun artisan disponible",
+                          style: GoogleFonts.poppins(
+                            fontSize: R(13),
+                            color: const Color(0xFF9CA3AF),
+                          ),
+                        ),
+                      )
+                    // Dynamic list from DB ✅
+                    : ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        padding: EdgeInsets.symmetric(horizontal: R(18)),
+                        itemCount: vm.artisans.length,
+                        separatorBuilder: (_, _) => SizedBox(width: R(14)),
+                        itemBuilder: (context, i) =>
+                            _ArtisanCard(artisan: vm.artisans[i]),
+                      ),
               ),
 
               SizedBox(height: R(26)),
@@ -375,7 +349,6 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               SizedBox(height: R(12)),
-
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: R(18)),
                 child: Column(
@@ -420,158 +393,238 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-// ====================== BOTTOM NAV (RESPONSIVE) ======================
-class _BottomNav extends StatelessWidget {
-  final int current;
-  final ValueChanged<int> onTap;
+// ====================== ARTISAN CARD — takes ArtisanModel from DB ✅ ======================
 
-  const _BottomNav({required this.current, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    double R(double v) => Responsive.s(v);
-
-    return Center(
-      child: Container(
-        height: R(64),
-        margin: EdgeInsets.symmetric(horizontal: R(18)),
-        padding: EdgeInsets.symmetric(horizontal: R(10)),
-        decoration: BoxDecoration(
-          color: const Color(0xFF2D2F33),
-          borderRadius: BorderRadius.circular(R(32)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.20),
-              blurRadius: R(18),
-              offset: Offset(0, R(10)),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _NavItem(
-              icon: Icons.home_rounded,
-              active: current == 0,
-              onTap: () => onTap(0),
-            ),
-            _NavItem(
-              icon: Icons.description_outlined,
-              active: current == 1,
-              onTap: () => onTap(1),
-            ),
-            _PlusButton(onTap: () => onTap(2)),
-            _NavItem(
-              icon: Icons.chat_bubble_outline_rounded,
-              active: current == 3,
-              onTap: () => onTap(3),
-            ),
-            _NavItem(
-              icon: Icons.person_outline_rounded,
-              active: current == 4,
-              onTap: () => onTap(4),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  final IconData icon;
-  final bool active;
-  final VoidCallback onTap;
-
-  const _NavItem({
-    required this.icon,
-    required this.active,
-    required this.onTap,
-  });
+class _ArtisanCard extends StatelessWidget {
+  final ArtisanModel artisan;
+  const _ArtisanCard({required this.artisan});
 
   @override
   Widget build(BuildContext context) {
     double R(double v) => Responsive.s(v);
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(R(24)),
-      onTap: onTap,
-      child: SizedBox(
-        width: R(54),
-        height: R(54),
-        child: Center(
-          child: Icon(
-            icon,
-            size: R(24),
-            color: active ? Colors.white : Colors.white.withOpacity(0.55),
+    final ratingStr = "4.5";
+
+    return Container(
+      width: R(190),
+      padding: EdgeInsets.all(R(12)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(R(18)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.10),
+            blurRadius: R(14),
+            offset: Offset(0, R(8)),
           ),
-        ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Photo ──
+          ClipRRect(
+            borderRadius: BorderRadius.circular(R(14)),
+            child: Stack(
+              children: [
+                CachedNetworkImage(
+                  imageUrl: artisan.profilePhoto ?? '',
+                  height: R(120),
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+
+                Positioned(
+                  left: R(10),
+                  top: R(10),
+                  child: Container(
+                    width: R(28),
+                    height: R(28),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.engineering_rounded,
+                      size: R(16),
+                      color: const Color(0xFFFC5A15),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          SizedBox(height: R(10)),
+
+          // ── Name + verified badge ──
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  artisan.name,
+                  style: GoogleFonts.poppins(
+                    color: Colors.black,
+                    fontSize: R(13),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.verified_rounded,
+                size: R(16),
+                color: const Color(0xFF2563EB),
+              ),
+            ],
+          ),
+
+          SizedBox(height: R(4)),
+
+          // ── Speciality ──
+          Text(
+            artisan.speciality.toString(),
+            style: GoogleFonts.poppins(
+              fontSize: R(11),
+              color: const Color(0xFF6B7280),
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+
+          SizedBox(height: R(8)),
+
+          // ── City ──
+          Row(
+            children: [
+              Icon(
+                Icons.location_on_outlined,
+                size: R(14),
+                color: const Color(0xFF9CA3AF),
+              ),
+              SizedBox(width: R(4)),
+              Expanded(
+                child: Text(
+                  artisan.ville ?? '—',
+                  style: GoogleFonts.poppins(
+                    fontSize: R(11),
+                    color: const Color(0xFF6B7280),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+
+          SizedBox(height: R(8)),
+
+          // ── Rating ──
+          Row(
+            children: [
+              Icon(
+                Icons.star_rounded,
+                size: R(14),
+                color: const Color(0xFFF59E0B),
+              ),
+              SizedBox(width: R(4)),
+              Expanded(
+                child: Text(
+                  ratingStr,
+                  style: GoogleFonts.poppins(
+                    fontSize: R(10.5),
+                    color: const Color(0xFF6B7280),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          SizedBox(height: R(10)),
+
+          // ── View Profile ──
+          SizedBox(
+            width: double.infinity,
+            height: R(36),
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ArtisanProfileScreen(artisan: artisan),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF3F4F6),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(R(18)),
+                ),
+              ),
+              child: Text(
+                "Voir profil",
+                style: GoogleFonts.poppins(
+                  fontSize: R(11),
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF111827),
+                ),
+              ),
+            ),
+          ),
+
+          SizedBox(height: R(8)),
+
+          // ── Contact ──
+          SizedBox(
+            width: double.infinity,
+            height: R(38),
+            child: ElevatedButton(
+              onPressed: () {},
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFC5A15),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(R(18)),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.phone_rounded, size: R(16), color: Colors.white),
+                  SizedBox(width: R(8)),
+                  Text(
+                    "Connecter",
+                    style: GoogleFonts.poppins(
+                      fontSize: R(11),
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
-}
 
-class _PlusButton extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const _PlusButton({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    double R(double v) => Responsive.s(v);
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(R(26)),
-      child: Container(
-        width: R(54),
-        height: R(54),
-        decoration: const BoxDecoration(
-          color: Color(0xFFF3F4F6),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(
-          Icons.add_rounded,
-          color: const Color(0xFF2D2F33),
-          size: R(26),
-        ),
+  Widget _placeholder(double Function(double) R) => Container(
+    height: R(120),
+    width: double.infinity,
+    color: const Color(0xFFE5E7EB),
+    child: Center(
+      child: Icon(
+        Icons.person_outline_rounded,
+        size: R(40),
+        color: const Color(0xFF9CA3AF),
       ),
-    );
-  }
-}
-
-// ====================== SMALL WIDGETS (RESPONSIVE) ======================
-class _CircleIcon extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _CircleIcon({required this.icon, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    double R(double v) => Responsive.s(v);
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(R(22)),
-      onTap: onTap,
-      child: Container(
-        width: R(42),
-        height: R(42),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, color: const Color(0xFF111827), size: R(20)),
-      ),
-    );
-  }
+    ),
+  );
 }
 
 class _SearchPill extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
   final Widget rightWidget;
-
   const _SearchPill({
     required this.controller,
     required this.hint,
@@ -581,7 +634,6 @@ class _SearchPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     double R(double v) => Responsive.s(v);
-
     return Container(
       height: R(54),
       padding: EdgeInsets.only(left: R(16), right: R(6)),
@@ -619,7 +671,6 @@ class _CatItem extends StatelessWidget {
   final Color color;
   final IconData icon;
   final String label;
-
   const _CatItem({
     required this.color,
     required this.icon,
@@ -629,7 +680,6 @@ class _CatItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     double R(double v) => Responsive.s(v);
-
     return Column(
       children: [
         Container(
@@ -657,13 +707,11 @@ class _CatItem extends StatelessWidget {
 
 class _PromoCard extends StatelessWidget {
   final double width;
-
   const _PromoCard({required this.width});
 
   @override
   Widget build(BuildContext context) {
     double R(double v) => Responsive.s(v);
-
     return Container(
       height: R(140),
       decoration: BoxDecoration(
@@ -745,13 +793,11 @@ class _PromoCard extends StatelessWidget {
               child: Image.asset(
                 "images/worker.png",
                 fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) {
-                  return Icon(
-                    Icons.engineering_rounded,
-                    color: Colors.white,
-                    size: R(64),
-                  );
-                },
+                errorBuilder: (_, _, _) => Icon(
+                  Icons.engineering_rounded,
+                  color: Colors.white,
+                  size: R(64),
+                ),
               ),
             ),
           ),
@@ -761,202 +807,26 @@ class _PromoCard extends StatelessWidget {
   }
 }
 
-class _ArtisanCard extends StatelessWidget {
-  final String imageAsset;
-  final String name;
-  final String job;
-  final String city;
-  final String rating;
-
-  const _ArtisanCard({
-    required this.imageAsset,
-    required this.name,
-    required this.job,
-    required this.city,
-    required this.rating,
-  });
+// ====================== SMALL WIDGETS ======================
+class _CircleIcon extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  const _CircleIcon({required this.icon, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     double R(double v) => Responsive.s(v);
-
-    return Container(
-      width: R(190),
-      padding: EdgeInsets.all(R(12)),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(R(18)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.10),
-            blurRadius: R(14),
-            offset: Offset(0, R(8)),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(R(14)),
-            child: Stack(
-              children: [
-                Image.asset(
-                  imageAsset,
-                  height: R(120),
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) {
-                    return Container(
-                      height: R(120),
-                      color: const Color(0xFFE5E7EB),
-                      child: const Center(
-                        child: Icon(Icons.image_not_supported_outlined),
-                      ),
-                    );
-                  },
-                ),
-                Positioned(
-                  left: R(10),
-                  top: R(10),
-                  child: Container(
-                    width: R(28),
-                    height: R(28),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.water_drop_rounded,
-                      size: R(16),
-                      color: const Color(0xFFFC5A15),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: R(10)),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  name,
-                  style: GoogleFonts.poppins(
-                    fontSize: R(13),
-                    fontWeight: FontWeight.w700,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Icon(
-                Icons.verified_rounded,
-                size: R(16),
-                color: const Color(0xFF2563EB),
-              ),
-            ],
-          ),
-          SizedBox(height: R(6)),
-          Text(
-            job,
-            style: GoogleFonts.poppins(
-              fontSize: R(11),
-              color: const Color(0xFF6B7280),
-            ),
-          ),
-          SizedBox(height: R(8)),
-          Row(
-            children: [
-              Icon(
-                Icons.location_on_outlined,
-                size: R(14),
-                color: const Color(0xFF9CA3AF),
-              ),
-              SizedBox(width: R(4)),
-              Expanded(
-                child: Text(
-                  city,
-                  style: GoogleFonts.poppins(
-                    fontSize: R(11),
-                    color: const Color(0xFF6B7280),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: R(8)),
-          Row(
-            children: [
-              Icon(
-                Icons.star_rounded,
-                size: R(14),
-                color: const Color(0xFFF59E0B),
-              ),
-              SizedBox(width: R(4)),
-              Expanded(
-                child: Text(
-                  rating,
-                  style: GoogleFonts.poppins(
-                    fontSize: R(10.5),
-                    color: const Color(0xFF6B7280),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(
-            width: double.infinity,
-            height: R(36),
-            child: ElevatedButton(
-              onPressed: () {},
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFF3F4F6),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(R(18)),
-                ),
-              ),
-              child: Text(
-                "View Profile",
-                style: GoogleFonts.poppins(
-                  fontSize: R(11),
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF111827),
-                ),
-              ),
-            ),
-          ),
-          SizedBox(height: R(10)),
-          SizedBox(
-            width: double.infinity,
-            height: R(38),
-            child: ElevatedButton(
-              onPressed: () {},
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFC5A15),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(R(18)),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.phone_rounded, size: R(16), color: Colors.white),
-                  SizedBox(width: R(8)),
-                  Text(
-                    "Connecter",
-                    style: GoogleFonts.poppins(
-                      fontSize: R(11),
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
+    return InkWell(
+      borderRadius: BorderRadius.circular(R(22)),
+      onTap: onTap,
+      child: Container(
+        width: R(42),
+        height: R(42),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: const Color(0xFF111827), size: R(20)),
       ),
     );
   }
@@ -967,7 +837,6 @@ class _FaqTile extends StatelessWidget {
   final bool opened;
   final VoidCallback onTap;
   final String? body;
-
   const _FaqTile({
     required this.title,
     required this.opened,
@@ -978,10 +847,8 @@ class _FaqTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     double R(double v) => Responsive.s(v);
-
     final bg = opened ? const Color(0xFF2D2F33) : Colors.white;
     final fg = opened ? Colors.white : const Color(0xFF111827);
-
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(R(16)),
@@ -1054,7 +921,7 @@ class _StubPage extends StatelessWidget {
                 vm.logout();
                 Navigator.pushNamed(context, '/login');
               },
-              child: Text("logout"),
+              child: const Text("logout"),
             ),
             Text(
               title,

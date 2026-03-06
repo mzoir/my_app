@@ -1,15 +1,14 @@
-import 'view/Home.dart';
 import 'view/LoginP.dart';
 import 'package:flutter/material.dart';
 import 'viewmodels/UserViewModel.dart ';
 import 'package:provider/provider.dart';
-import 'package:my_app/view/Profile.dart';
 import 'package:my_app/view/logout.dart';
 import 'package:my_app/view/client/register_client.dart';
-import 'package:my_app/view/client/Home/official.dart';
+import 'package:my_app/view/artisan/Home/navbottom.dart';
+import 'package:my_app/view/client/Home/navbottom.dart';
 import 'package:my_app/viewmodels/artisan_view_model.dart';
-
-import 'package:my_app/view/artisan/Home/official.dart';
+import 'package:my_app/utils/responsive.dart';
+import 'package:my_app/utils/responsive.dart';
 import 'package:my_app/view/client/planc.dart';
 import 'package:my_app/view/artisan/register_Artisan.dart';
 import 'package:my_app/viewmodels/handle.dart';
@@ -47,6 +46,10 @@ class MyApp extends StatelessWidget {
         return MaterialApp(
           title: 'Flutter Demo',
           debugShowCheckedModeBanner: false,
+          builder: (context, child) {
+            Responsive.init(context); // ← one line, covers every screen
+            return child!;
+          },
           theme: ThemeData(
             colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
           ),
@@ -55,15 +58,14 @@ class MyApp extends StatelessWidget {
           routes: {
             '/login': (_) => const LoginPage(),
             '/home': (_) => SubscriptionPlans(),
-            '/home/client': (_) => HomeShell(),
+            '/home/client': (_) => HomeShellC(),
             '/logout': (_) => const LogoutPage(),
-            '/profile': (_) => const ProfilePage(),
             '/connect': (_) => const ChooseProfilePage(),
             '/client/register': (_) => const RegisterPage(),
             '/artisan/register': (_) => const ArtisanRegister(),
-            '/connectgoogle':(_) =>  GoogleLoginDemo(),
-            '/home/artisan' : (_)=>  HomeShell()
-          }, 
+            '/connectgoogle': (_) => GoogleLoginDemo(),
+            '/home/artisan': (_) => HomeShell(),
+          },
         );
       },
     );

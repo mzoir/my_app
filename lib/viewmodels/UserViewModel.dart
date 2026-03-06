@@ -83,6 +83,7 @@ class AuthProvider extends ChangeNotifier {
     String password,
     String phone,
     String dateOfBirth,
+    String Ville,
   ) async {
     loading = true;
     error = null;
@@ -166,10 +167,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       final res = await http.get(
         Uri.parse('$baseUrl/api/user'),
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $t',
-        },
+        headers: {'Accept': 'application/json', 'Authorization': 'Bearer $t'},
       );
 
       if (res.statusCode == 200) {
@@ -240,7 +238,7 @@ class AuthProvider extends ChangeNotifier {
           'description': description,
           'ville': ville,
           'address': address,
-          if (additionalInfo != null) 'additional_info': additionalInfo,
+          'additional_info': ?additionalInfo,
         }),
       );
 
@@ -323,13 +321,13 @@ class AuthProvider extends ChangeNotifier {
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          if (serviceName != null) 'service_name': serviceName,
-          if (serviceType != null) 'service_type': serviceType,
-          if (description != null) 'description': description,
-          if (ville != null) 'ville': ville,
-          if (address != null) 'address': address,
-          if (additionalInfo != null) 'additional_info': additionalInfo,
-          if (status != null) 'status': status,
+          'service_name': ?serviceName,
+          'service_type': ?serviceType,
+          'description': ?description,
+          'ville': ?ville,
+          'address': ?address,
+          'additional_info': ?additionalInfo,
+          'status': ?status,
         }),
       );
 
@@ -374,5 +372,17 @@ class AuthProvider extends ChangeNotifier {
       error = 'Network error: $e';
       return null;
     }
+  }
+
+  void update(String? name,
+    String? email,
+    String? phone,
+    String? dob,
+    String? city,
+    String? address,
+    String? zipCode,
+) {
+    
+    print('');
   }
 }

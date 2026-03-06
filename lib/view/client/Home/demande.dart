@@ -1,15 +1,6 @@
-import 'package:my_app/viewmodels/client_view_model.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'mesdeamndes.dart';
-import 'demande.dart';
 import 'package:provider/provider.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:my_app/view/core/app_colors.dart';
-import 'package:my_app/view/LoginP.dart';
-import 'package:my_app/utils/responsive.dart';
-import 'profileScreen.dart';
-import 'package:my_app/viewmodels/UserViewModel.dart';
+import 'package:my_app/viewmodels/client_view_model.dart';
 
 
 
@@ -20,7 +11,13 @@ class NewDemandeFlow extends StatefulWidget {
   State<NewDemandeFlow> createState() => _NewDemandeFlowState();
 }
 
-class _NewDemandeFlowState extends State<NewDemandeFlow> {
+class _NewDemandeFlowState extends State<NewDemandeFlow>
+    with AutomaticKeepAliveClientMixin {
+
+  // ✅ ADDED
+  @override
+  bool get wantKeepAlive => true;
+
   int _step = 0; // 0 = choose service, 1 = choose type, 2 = details
 
   String? _selectedService;
@@ -31,15 +28,15 @@ class _NewDemandeFlowState extends State<NewDemandeFlow> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // ✅ ADDED (IMPORTANT)
+
     return Scaffold(
       backgroundColor: const Color(0xFFF4F4F4),
       appBar: AtlasAppBar(withSearch: _step == 0 || _step == 2),
       body: Column(
         children: [
-          // Step progress bar
           SizedBox(height: 10,),
           _StepProgressBar(currentStep: _step, totalSteps: 3),
-
           Expanded(
             child: Padding(
               padding: EdgeInsets.only(
@@ -47,45 +44,45 @@ class _NewDemandeFlowState extends State<NewDemandeFlow> {
                 bottom: MediaQuery.of(context).padding.bottom + 12,
               ),
               child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 280),
-              transitionBuilder: (child, anim) => FadeTransition(
-                opacity: anim,
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(0.04, 0),
-                    end: Offset.zero,
-                  ).animate(anim),
-                  child: child,
+                duration: const Duration(milliseconds: 280),
+                transitionBuilder: (child, anim) => FadeTransition(
+                  opacity: anim,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0.04, 0),
+                      end: Offset.zero,
+                    ).animate(anim),
+                    child: child,
+                  ),
                 ),
+                child: _step == 0
+                    ? ChooseServiceScreen(
+                        key: const ValueKey(0),
+                        onSelected: (s) {
+                          setState(() => _selectedService = s);
+                          _goNext();
+                        },
+                      )
+                    : _step == 1
+                        ? ChooseTypeScreen(
+                            key: const ValueKey(1),
+                            serviceName: _selectedService ?? 'Réparations générales',
+                            selectedTypes: _selectedTypes,
+                            onToggle: (t) => setState(() {
+                              _selectedTypes.contains(t)
+                                  ? _selectedTypes.remove(t)
+                                  : _selectedTypes.add(t);
+                            }),
+                            onPrev: _goPrev,
+                            onNext: _goNext,
+                          )
+                        : DemandeDetailsScreen(
+                            key: const ValueKey(2),
+                            selectedService: _selectedService ?? '',
+                            selectedTypes: List.unmodifiable(_selectedTypes),
+                            onPrev: _goPrev,
+                          ),
               ),
-              child: _step == 0
-                  ? ChooseServiceScreen(
-                      key: const ValueKey(0),
-                      onSelected: (s) {
-                        setState(() => _selectedService = s);
-                        _goNext();
-                      },
-                    )
-                  : _step == 1
-                      ? ChooseTypeScreen(
-                          key: const ValueKey(1),
-                          serviceName: _selectedService ?? 'Réparations générales',
-                          selectedTypes: _selectedTypes,
-                          onToggle: (t) => setState(() {
-                            _selectedTypes.contains(t)
-                                ? _selectedTypes.remove(t)
-                                : _selectedTypes.add(t);
-                          }),
-                          onPrev: _goPrev,
-                          onNext: _goNext,
-                        )
-                      : DemandeDetailsScreen(
-                          key: const ValueKey(2),
-                          selectedService: _selectedService ?? '',
-                          selectedTypes: List.unmodifiable(_selectedTypes),
-                          onPrev: _goPrev,
-                        ),
-            ),
             ),
           ),
         ],
@@ -93,6 +90,8 @@ class _NewDemandeFlowState extends State<NewDemandeFlow> {
     );
   }
 }
+
+
 
 // ─── STEP PROGRESS BAR ────────────────────────────────────────────────────────
 
@@ -146,6 +145,7 @@ class ChooseServiceScreen extends StatelessWidget {
     final crossCount = screenWidth > 600 ? 4 : 3;
 
     return SingleChildScrollView(
+       key: const PageStorageKey('choose_type_scroll'),
       padding: EdgeInsets.fromLTRB(hPad, 20, hPad, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -271,6 +271,7 @@ class ChooseTypeScreen extends StatelessWidget {
       children: [
         Expanded(
           child: SingleChildScrollView(
+            key: const PageStorageKey('choose_service_scroll'),
             padding: EdgeInsets.fromLTRB(hPad, 20, hPad, 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -489,7 +490,7 @@ class _DemandeDetailsScreenState extends State<DemandeDetailsScreen> {
       return;
     }
 
-    final auth = context.read<AuthProvider>();
+    final auth = context.read<ClientViewModel>();
 
     final success = await auth.createRequest(
       serviceName: widget.selectedService,
@@ -525,12 +526,13 @@ class _DemandeDetailsScreenState extends State<DemandeDetailsScreen> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final hPad = screenWidth > 600 ? 32.0 : 20.0;
-    final auth = context.watch<AuthProvider>();
+    final auth = context.watch<ClientViewModel>();
 
     return Column(
       children: [
         Expanded(
           child: SingleChildScrollView(
+             key: const PageStorageKey('choose_type_scroll'),
             padding: EdgeInsets.fromLTRB(hPad, 20, hPad, 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1033,10 +1035,10 @@ class _Service {
 }
 
 const List<_Service> _services = [
-  _Service('Réparations générales', Icons.build_outlined, Color(0xFFE91E63)),
-  _Service('Plomberie', Icons.water_drop_outlined, Color(0xFF2196F3)),
-  _Service('Électricité', Icons.bolt, Color(0xFFFFC107)),
-  _Service('Peinture', Icons.format_paint_outlined, Color(0xFF9C27B0)),
+  _Service('Réparations générales', Icons.build_outlined, Color.fromARGB(255, 238, 11, 11)),
+  _Service('Plomberie', Icons.water_drop_outlined, Color.fromARGB(255, 4, 91, 221)),
+  _Service('Électricité', Icons.bolt, Color.fromARGB(255, 202, 164, 48)),
+  _Service('Peinture', Icons.format_paint_outlined, Color.fromARGB(255, 182, 27, 209)),
   _Service('Électroménager', Icons.kitchen_outlined, Color(0xFFE91E63)),
   _Service('Nettoyage', Icons.cleaning_services_outlined, Color(0xFF00BCD4)),
   _Service('Déménagement', Icons.inventory_2_outlined, Color(0xFF673AB7)),

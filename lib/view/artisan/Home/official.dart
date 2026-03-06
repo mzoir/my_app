@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:my_app/utils/responsive.dart';
-import 'package:my_app/view/core/app_colors.dart';
+import 'package:my_app/viewmodels/client_view_model.dart';
+import 'package:my_app/models/artisan_model.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
+import 'notify_artisan.dart';
+import 'artisanScreen.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -12,34 +16,42 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  // ✅ simple FAQ open state
   int openFaq = 1;
+  int _selectedNav = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Fetch artisans from DB on load
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ClientViewModel>().fetchArtisans();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<ClientViewModel>();
+
     return LayoutBuilder(
       builder: (context, c) {
-        // ✅ init your Responsive system with current constraints
-        Responsive.init(c);
-
-        // ✅ shortcut to scale values
         double R(double v) => Responsive.s(v);
 
         return Scaffold(
           backgroundColor: const Color(0xFFFFF3EC),
 
-          // ✅ FIX: use Column inside ScrollView (NOT Positioned content)
           body: SafeArea(
+            bottom: false,
             child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
               child: Column(
                 children: [
                   // =====================================================
-                  // HEADER + SEARCH (only this part uses Stack)
+                  // HEADER + SEARCH
                   // =====================================================
                   Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      // HEADER (fixed height => Stack is safe)
+                      // Orange header
                       Container(
                         height: R(160),
                         width: double.infinity,
@@ -51,14 +63,13 @@ class _HomePageState extends State<HomePage> {
                         ),
                         child: Stack(
                           children: [
+                            // Logo
                             Positioned(
                               top: R(18),
                               left: R(18),
-                              child: SvgPicture.asset(
-                                'images/Exclude.svg',
-                                height: R(34),
-                              ),
+                              child: _logoWidget(R),
                             ),
+                            // Action icons
                             Positioned(
                               top: R(14),
                               right: R(18),
@@ -66,7 +77,21 @@ class _HomePageState extends State<HomePage> {
                                 children: [
                                   _iconBtn(Icons.calendar_today_outlined, R),
                                   SizedBox(width: R(10)),
-                                  _iconBtn(Icons.notifications_none_rounded, R),
+                                  GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              const NotificationsPage(),
+                                        ),
+                                      );
+                                    },
+                                    child: _iconBtn(
+                                      Icons.notifications_none_rounded,
+                                      R,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -74,16 +99,16 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
 
-                      // SEARCH BAR (floating over header)
+                      // Floating search bar
                       Positioned(
-                        left: R(20),
-                        right: R(20),
-                        bottom: -R(23), // ✅ push down outside header
+                        left: R(40),
+                        right: R(40),
+                        top: R(80),
                         child: Container(
-                          height: R(46),
+                          height: R(56),
                           padding: EdgeInsets.symmetric(horizontal: R(14)),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: const Color.fromARGB(255, 209, 138, 75),
                             borderRadius: BorderRadius.circular(R(30)),
                             boxShadow: [
                               BoxShadow(
@@ -95,18 +120,31 @@ class _HomePageState extends State<HomePage> {
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.search,
-                                  size: R(18), color: Colors.black87),
+                              Icon(
+                                Icons.search,
+                                size: R(18),
+                                color: Colors.black87,
+                              ),
                               SizedBox(width: R(8)),
                               Expanded(
-                                child: Text(
-                                  "Quelle demande recherchez-vous ?",
-                                  overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.poppins(
-                                    fontSize: R(12),
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
+                                child: TextField(
+  style: GoogleFonts.poppins(
+    fontSize: R(12),
+    color: Colors.black, // Text color when user types
+  ),
+  decoration: InputDecoration(
+    hintText: "Quelle demande recherchez-vous ?", // Placeholder
+    hintStyle: GoogleFonts.poppins(
+      fontSize: R(12),
+      color: Colors.grey.shade600, // Same as your previous Text
+    ),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8), // Rounded corners if you want
+      borderSide: BorderSide.none, // No border
+    ),
+    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+  ),
+),
                               ),
                               Container(
                                 width: R(32),
@@ -115,8 +153,11 @@ class _HomePageState extends State<HomePage> {
                                   color: Color(0xFF2F2F2F),
                                   shape: BoxShape.circle,
                                 ),
-                                child: Icon(Icons.tune,
-                                    color: Colors.white, size: R(16)),
+                                child: Icon(
+                                  Icons.search_off_rounded,
+                                  color: Colors.white,
+                                  size: R(16),
+                                ),
                               ),
                             ],
                           ),
@@ -125,24 +166,57 @@ class _HomePageState extends State<HomePage> {
                     ],
                   ),
 
-                  SizedBox(height: R(40)), // ✅ space after floating search
+                  SizedBox(height: R(40)),
 
                   // =====================================================
-                  // CONTENT (no Positioned, fully scrollable)
+                  // CONTENT
                   // =====================================================
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: R(20)),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _sectionTitle("Annonce d’Aujourd’hui", R),
+                        _sectionTitle("Annonce d'Aujourd'hui", R),
                         SizedBox(height: R(10)),
                         _promoCard(R),
 
                         SizedBox(height: R(24)),
-                        _sectionRow("Nos artisans les mieux notés", "Voir plus", R),
+                        _sectionRow(
+                          "Nos artisans les mieux notés",
+                          "Voir plus",
+                          R,
+                        ),
                         SizedBox(height: R(14)),
-                        _artisanRow(R),
+
+                        // ── Dynamic artisan list from DB ──
+                        SizedBox(
+                          height: R(350),
+                          child: vm.loadingArtisans
+                              ? Center(
+                                  child: CircularProgressIndicator(
+                                    color: const Color(0xFFFC5A15),
+                                    strokeWidth: R(2.5),
+                                  ),
+                                )
+                              : vm.artisans.isEmpty
+                              ? Center(
+                                  child: Text(
+                                    "Aucun artisan disponible",
+                                    style: GoogleFonts.poppins(
+                                      fontSize: R(13),
+                                      color: const Color(0xFF9CA3AF),
+                                    ),
+                                  ),
+                                )
+                              : ListView.separated(
+                                  scrollDirection: Axis.horizontal,
+                                  itemCount: vm.artisans.length,
+                                  separatorBuilder: (_, _) =>
+                                      SizedBox(width: R(14)),
+                                  itemBuilder: (context, i) =>
+                                      ArtisanCard(artisan: vm.artisans[i]),
+                                ),
+                        ),
 
                         SizedBox(height: R(30)),
                         _addServiceCard(R),
@@ -157,7 +231,7 @@ class _HomePageState extends State<HomePage> {
                         SizedBox(height: R(12)),
                         _faqBlock(R),
 
-                        SizedBox(height: R(120)), // space for bottom nav
+                        SizedBox(height: R(30)),
                       ],
                     ),
                   ),
@@ -165,57 +239,62 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ),
-
-          // =====================================================
-          // BOTTOM NAV (must define R here too)
-          // =====================================================
-          bottomNavigationBar: Builder(
-            builder: (context) {
-              double R(double v) => Responsive.s(v);
-
-              return Container(
-                height: R(78),
-                padding: EdgeInsets.only(bottom: R(10)),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius:
-                      BorderRadius.vertical(top: Radius.circular(R(30))),
-                  boxShadow: [
-                    BoxShadow(
-                      blurRadius: R(18),
-                      offset: Offset(0, -R(6)),
-                      color: Colors.black.withOpacity(0.08),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _navItem(Icons.home_rounded, true, R),
-                    _navItem(Icons.receipt_long_rounded, false, R),
-                    _navItem(Icons.handyman_rounded, false, R),
-                    _navItem(Icons.chat_bubble_outline_rounded, false, R),
-                    _navItem(Icons.person_outline_rounded, false, R),
-                  ],
-                ),
-              );
-            },
-          ),
         );
       },
     );
   }
 
   // =====================================================
-  // WIDGETS
+  // LOGO
+  // =====================================================
+
+  Widget _logoWidget(double Function(double) R) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text(
+          'Atlas',
+          style: TextStyle(
+            fontFamily: 'Poppins',
+            fontSize: R(26),
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+            height: 1,
+          ),
+        ),
+        SizedBox(width: R(5)),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: R(7), vertical: R(3)),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(R(7)),
+          ),
+          child: Text(
+            'Fix',
+            style: GoogleFonts.poppins(
+              fontSize: R(14),
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFFFC5A15),
+              height: 1,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // =====================================================
+  // SHARED WIDGETS
   // =====================================================
 
   Widget _iconBtn(IconData icon, double Function(double) R) {
     return Container(
       width: R(38),
       height: R(38),
-      decoration:
-          const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+      ),
       child: Icon(icon, size: R(18), color: Colors.black87),
     );
   }
@@ -248,13 +327,22 @@ class _HomePageState extends State<HomePage> {
           width: R(26),
           height: R(26),
           decoration: const BoxDecoration(
-              color: Color(0xFF2F2F2F), shape: BoxShape.circle),
-          child: Icon(Icons.arrow_forward_ios_rounded,
-              size: R(12), color: Colors.white),
+            color: Color(0xFF2F2F2F),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.arrow_forward_ios_rounded,
+            size: R(12),
+            color: Colors.white,
+          ),
         ),
       ],
     );
   }
+
+  // =====================================================
+  // PROMO CARD
+  // =====================================================
 
   Widget _promoCard(double Function(double) R) {
     return Container(
@@ -281,8 +369,7 @@ class _HomePageState extends State<HomePage> {
             left: R(18),
             top: R(18),
             child: Container(
-              padding:
-                  EdgeInsets.symmetric(horizontal: R(10), vertical: R(4)),
+              padding: EdgeInsets.symmetric(horizontal: R(10), vertical: R(4)),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.25),
                 borderRadius: BorderRadius.circular(R(20)),
@@ -349,179 +436,9 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _artisanRow(double Function(double) R) {
-    return Row(
-      children: [
-        Expanded(
-          child: _artisanCard(
-            name: "Ahmed Bennani",
-            city: "Casablanca",
-            job: "Plomberie & Sanitaire",
-            R: R,
-          ),
-        ),
-        SizedBox(width: R(12)),
-        Expanded(
-          child: _artisanCard(
-            name: "Omar Berrada",
-            city: "Marrakech",
-            job: "Dépannage Urgence",
-            R: R,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _artisanCard({
-    required String name,
-    required String city,
-    required String job,
-    required double Function(double) R,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(R(16)),
-        boxShadow: [
-          BoxShadow(
-            blurRadius: R(14),
-            offset: Offset(0, R(6)),
-            color: Colors.black.withOpacity(0.10),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(R(16))),
-            child: Container(
-              height: R(115),
-              color: Colors.grey.shade300,
-              child: Center(
-                child: Icon(Icons.image,
-                    size: R(30), color: Colors.grey.shade600),
-              ),
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.all(R(12)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        name,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.poppins(
-                          fontSize: R(12),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    Icon(Icons.verified,
-                        color: const Color(0xFF2D7FF9), size: R(14)),
-                  ],
-                ),
-                SizedBox(height: R(4)),
-                Text(job,
-                    style: GoogleFonts.poppins(
-                        fontSize: R(10.5), color: Colors.grey.shade700)),
-                SizedBox(height: R(6)),
-                Row(
-                  children: [
-                    Icon(Icons.location_on_outlined,
-                        size: R(14), color: Colors.grey.shade700),
-                    SizedBox(width: R(4)),
-                    Expanded(
-                      child: Text(city,
-                          style: GoogleFonts.poppins(
-                              fontSize: R(10.5),
-                              color: Colors.grey.shade700)),
-                    ),
-                  ],
-                ),
-                SizedBox(height: R(6)),
-                Row(
-                  children: [
-                    Icon(Icons.star_rounded,
-                        size: R(14), color: const Color(0xFFFFA000)),
-                    SizedBox(width: R(4)),
-                    Text(
-                      "4.9/5 (127 reviews)",
-                      style: GoogleFonts.poppins(
-                          fontSize: R(10.2), color: Colors.grey.shade700),
-                    ),
-                  ],
-                ),
-                SizedBox(height: R(10)),
-                _btnOrange("View Profile", R,
-                    icon: Icons.remove_red_eye_outlined),
-                SizedBox(height: R(8)),
-                _btnDark("Contacter", R,
-                    icon: Icons.chat_bubble_outline_rounded),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _btnOrange(String t, double Function(double) R,
-      {required IconData icon}) {
-    return Container(
-      height: R(36),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFC5A15),
-        borderRadius: BorderRadius.circular(R(22)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: R(16), color: Colors.white),
-          SizedBox(width: R(8)),
-          Text(
-            t,
-            style: GoogleFonts.poppins(
-              fontSize: R(11),
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _btnDark(String t, double Function(double) R,
-      {required IconData icon}) {
-    return Container(
-      height: R(36),
-      decoration: BoxDecoration(
-        color: const Color(0xFF2F2F2F),
-        borderRadius: BorderRadius.circular(R(22)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: R(16), color: Colors.white),
-          SizedBox(width: R(8)),
-          Text(
-            t,
-            style: GoogleFonts.poppins(
-              fontSize: R(11),
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // =====================================================
+  // ADD SERVICE CARD
+  // =====================================================
 
   Widget _addServiceCard(double Function(double) R) {
     return Container(
@@ -556,17 +473,21 @@ class _HomePageState extends State<HomePage> {
                     color: Colors.white.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(R(10)),
                   ),
-                  child: Icon(Icons.add_task_rounded,
-                      color: Colors.white, size: R(18)),
+                  child: Icon(
+                    Icons.add_task_rounded,
+                    color: Colors.white,
+                    size: R(18),
+                  ),
                 ),
                 SizedBox(width: R(10)),
                 Expanded(
                   child: Text(
-                    "En tant qu’artisan, souhaitez-vous ajouter un autre service ?",
+                    "En tant qu'artisan, souhaitez-vous ajouter un autre service ?",
                     style: GoogleFonts.poppins(
-                        fontSize: R(12),
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white),
+                      fontSize: R(12),
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ],
@@ -575,7 +496,9 @@ class _HomePageState extends State<HomePage> {
             Text(
               "Vorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam eu turpis molestie, dictum",
               style: GoogleFonts.poppins(
-                  fontSize: R(10.5), color: Colors.white.withOpacity(0.85)),
+                fontSize: R(10.5),
+                color: Colors.white.withOpacity(0.85),
+              ),
             ),
             SizedBox(height: R(14)),
             Container(
@@ -589,15 +512,19 @@ class _HomePageState extends State<HomePage> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.add_circle_outline_rounded,
-                        color: Colors.white, size: R(16)),
+                    Icon(
+                      Icons.add_circle_outline_rounded,
+                      color: Colors.white,
+                      size: R(16),
+                    ),
                     SizedBox(width: R(8)),
                     Text(
                       "Ajouter un service",
                       style: GoogleFonts.poppins(
-                          fontSize: R(11),
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white),
+                        fontSize: R(11),
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
                     ),
                   ],
                 ),
@@ -608,6 +535,10 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+
+  // =====================================================
+  // REFERRAL CARD
+  // =====================================================
 
   Widget _referralCard(double Function(double) R) {
     return Column(
@@ -623,13 +554,19 @@ class _HomePageState extends State<HomePage> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.bolt_rounded,
-                  size: R(18), color: const Color(0xFFFC5A15)),
+              Icon(
+                Icons.bolt_rounded,
+                size: R(18),
+                color: const Color(0xFFFC5A15),
+              ),
               SizedBox(width: R(10)),
               Expanded(
                 child: Text(
                   "Gagnez 1 boost gratuit (7 jours) pour chaque ami qui crée un compte artisan via votre lien !",
-                  style: GoogleFonts.poppins(fontSize: R(11), color: Colors.black87),
+                  style: GoogleFonts.poppins(
+                    fontSize: R(11),
+                    color: Colors.black87,
+                  ),
                 ),
               ),
             ],
@@ -647,8 +584,11 @@ class _HomePageState extends State<HomePage> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.card_giftcard_rounded,
-                    color: Colors.white, size: R(16)),
+                Icon(
+                  Icons.card_giftcard_rounded,
+                  color: Colors.white,
+                  size: R(16),
+                ),
                 SizedBox(width: R(8)),
                 Text(
                   "Générer mon lien de parrainage",
@@ -665,6 +605,10 @@ class _HomePageState extends State<HomePage> {
       ],
     );
   }
+
+  // =====================================================
+  // FAQ
+  // =====================================================
 
   Widget _faqBlock(double Function(double) R) {
     return Column(
@@ -683,8 +627,7 @@ class _HomePageState extends State<HomePage> {
   Widget _faqTile(int i, String title, double Function(double) R) {
     final isOpen = openFaq == i;
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(R(16)),
+    return GestureDetector(
       onTap: () => setState(() => openFaq = (openFaq == i ? -1 : i)),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
@@ -737,18 +680,275 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _navItem(IconData icon, bool active, double Function(double) R) {
-    return Container(
-      width: R(54),
-      height: R(54),
-      decoration: BoxDecoration(
-        color: active ? const Color(0xFF2F2F2F) : Colors.transparent,
-        shape: BoxShape.circle,
+  // =====================================================
+  // BOTTOM NAV ITEM
+  // =====================================================
+
+  Widget _navItem(IconData icon, int index, double Function(double) R) {
+    final active = _selectedNav == index;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedNav = index),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: R(54),
+        height: R(54),
+        decoration: BoxDecoration(
+          color: active ? const Color(0xFF2F2F2F) : Colors.transparent,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          icon,
+          size: R(24),
+          color: active ? Colors.white : Colors.black87,
+        ),
       ),
-      child: Icon(
-        icon,
-        size: R(24),
-        color: active ? Colors.white : Colors.black87,
+    );
+  }
+}
+
+// =====================================================
+// ARTISAN CARD — takes ArtisanModel from DB ✅
+// =====================================================
+
+class ArtisanCard extends StatelessWidget {
+  final ArtisanModel artisan;
+  const ArtisanCard({super.key, required this.artisan});
+
+  @override
+  Widget build(BuildContext context) {
+    double R(double v) => Responsive.s(v);
+
+    // Base design: width=210, height=343, border-radius=12
+    // All values scaled proportionally from those base dimensions
+    const double baseW = 210;
+    const double baseH = 343;
+    const double basePhotoH = 160; // photo takes ~160/343 of card height
+
+    return Container(
+      width: R(baseW),
+      height: R(baseH),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(R(12)),
+        border: Border.all(color: const Color(0xFFE5E7EB), width: R(0.71)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: R(14),
+            offset: Offset(0, R(6)),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Photo section ──
+          ClipRRect(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(R(12))),
+            child: Stack(
+              children: [
+                CachedNetworkImage(
+                  imageUrl: artisan.profilePhoto ?? '',
+                  width: R(baseW),
+                  height: R(basePhotoH),
+                  fit: BoxFit.cover,
+                  errorWidget: (_, _, _) => Container(
+                    width: R(baseW),
+                    height: R(basePhotoH),
+                    color: const Color(0xFFE5E7EB),
+                    child: Icon(
+                      Icons.person_outline_rounded,
+                      size: R(48),
+                      color: const Color(0xFF9CA3AF),
+                    ),
+                  ),
+                ),
+                // Orange flame badge top-left
+                Positioned(
+                  top: R(10),
+                  left: R(10),
+                  child: Container(
+                    width: R(32),
+                    height: R(32),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFC5A15),
+                      borderRadius: BorderRadius.circular(R(8)),
+                    ),
+                    child: Icon(
+                      Icons.local_fire_department_rounded,
+                      color: Colors.white,
+                      size: R(18),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Info section ──
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(R(12), R(10), R(12), R(12)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Name + verified
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          artisan.name,
+                          style: GoogleFonts.poppins(
+                            fontSize: R(14),
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF111827),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      SizedBox(width: R(4)),
+                      Icon(
+                        Icons.verified_rounded,
+                        size: R(16),
+                        color: const Color(0xFF2563EB),
+                      ),
+                    ],
+                  ),
+
+                  SizedBox(height: R(4)),
+
+                  // Speciality
+                  Text(
+                    artisan.speciality.toString(),
+                    style: GoogleFonts.poppins(
+                      fontSize: R(11.5),
+                      color: const Color(0xFF6B7280),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+
+                  SizedBox(height: R(6)),
+
+                  // City
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on_outlined,
+                        size: R(13),
+                        color: const Color(0xFF6B7280),
+                      ),
+                      SizedBox(width: R(3)),
+                      Expanded(
+                        child: Text(
+                          artisan.ville ?? '—',
+                          style: GoogleFonts.poppins(
+                            fontSize: R(11.5),
+                            color: const Color(0xFF6B7280),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  SizedBox(height: R(6)),
+
+                  // Rating
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.star_rounded,
+                        size: R(14),
+                        color: const Color(0xFFFFA000),
+                      ),
+                      SizedBox(width: R(3)),
+                      Text(
+                        "4.9/5 (127 reviews)",
+                        style: GoogleFonts.poppins(
+                          fontSize: R(11),
+                          color: const Color(0xFF6B7280),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const Spacer(),
+
+                  // View Profile button
+                  SizedBox(
+                    width: double.infinity,
+                    height: R(36),
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                ArtisanProfileScreen(artisan: artisan),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFF3F4F6),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(R(22)),
+                        ),
+                      ),
+                      child: Text(
+                        "View Profile",
+                        style: GoogleFonts.poppins(
+                          fontSize: R(12),
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF111827),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  SizedBox(height: R(4)),
+
+                  // Connecter button
+                  SizedBox(
+                    width: double.infinity,
+                    height: R(38),
+                    child: ElevatedButton(
+                      onPressed: () {},
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFC5A15),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(R(22)),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.phone_rounded,
+                            size: R(15),
+                            color: Colors.white,
+                          ),
+                          SizedBox(width: R(7)),
+                          Text(
+                            "Connecter",
+                            style: GoogleFonts.poppins(
+                              fontSize: R(12),
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

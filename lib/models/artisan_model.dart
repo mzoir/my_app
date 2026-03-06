@@ -1,70 +1,64 @@
 class ArtisanModel {
-  final String nomComplet;
+  final int id;
+  final String name;
   final String email;
   final String phone;
-  final String password;
-
-  final String? dateNaissance; // format: YYYY-MM-DD
   final String? ville;
-  final String? adresse;
-  final String? diplome;
   final String? description;
-
-  // (optionnel) services
-  final List<int>? serviceIds;
-  final int? servicePrincipalId;
-  final String? newServiceName;
+  final String? speciality;
+  final String? profilePhoto;
+  final List<String?> portfolioImages; // ← ADD THIS
+  final double? rating;
+  final int reviewsCount;
+  final bool isVerified;
+  final List<String> services;
 
   ArtisanModel({
-    required this.nomComplet,
+    required this.id,
+    required this.name,
     required this.email,
     required this.phone,
-    required this.password,
-    this.dateNaissance,
     this.ville,
-    this.adresse,
-    this.diplome,
     this.description,
-    this.serviceIds,
-    this.servicePrincipalId,
-    this.newServiceName,
+    required this.portfolioImages,
+    this.speciality,
+    this.profilePhoto,
+    this.rating,
+    required this.reviewsCount,
+    required this.isVerified,
+    required this.services,
   });
 
-  /// ✅ Fields attendus par Laravel StoreArtisanRequest
-  Map<String, String> toJson() {
-    final data = <String, String>{
-      "nom_complet": nomComplet,
-      "email": email,
-      "phone": phone,
-      "password": password,
-    };
+  factory ArtisanModel.fromJson(Map<String, dynamic> json) {
+    const baseUrl = 'http://127.0.0.1:8000/';
 
-    // ✅ nullable: on les envoie seulement si non null et non vide
-    void putIfNotEmpty(String key, String? value) {
-      if (value != null && value.trim().isNotEmpty) {
-        data[key] = value.trim();
-      }
-    }
+  String fixUrl(String? url) {
+    if (url == null || url.isEmpty) return '';
+    if (url.startsWith('http')) return url; // already full URL
+    return '$baseUrl$url'; // ✅ add base URL
+  }
 
-    putIfNotEmpty("date_naissance", dateNaissance);
-    putIfNotEmpty("ville", ville);
-    putIfNotEmpty("adresse", adresse);
-    putIfNotEmpty("diplome", diplome);
-    putIfNotEmpty("description", description);
-
-    // ✅ services (si tu les utilises côté backend)
-    if (serviceIds != null && serviceIds!.isNotEmpty) {
-      // Laravel valide souvent service_ids comme array => on envoie service_ids[]
-      // avec plusieurs valeurs
-      // (dans MultipartRequest, on doit ajouter plusieurs fields)
-      // => géré dans le ViewModel
-    }
-
-    putIfNotEmpty("new_service_name", newServiceName);
-    if (servicePrincipalId != null) {
-      data["service_principal_id"] = servicePrincipalId.toString();
-    }
-
-    return data;
+    return ArtisanModel(
+      id: json["id"],
+      name: json["name"] ?? "",
+      email: json["email"] ?? "",
+      phone: json["phone"] ?? "",
+      ville: json["ville"],
+      description: json["description"],
+      speciality: json["speciality"],
+      profilePhoto: json["profile_photo"] != null ? fixUrl(json["profile_photo"]) : null,
+      rating: json["rating"] != null
+          ? double.tryParse(json["rating"].toString())
+          : null,
+      reviewsCount: json["reviews_count"] ?? 0,
+      isVerified: json["is_verified"] ?? false,
+       portfolioImages: (json['portfolio_images'] as List? ?? [])
+        .map((e) => fixUrl(e?.toString()))
+        .where((e) => e.isNotEmpty)
+        .toList(),
+      services: json["services"] != null
+          ? List<String>.from(json["services"])
+          : [],
+    );
   }
 }
